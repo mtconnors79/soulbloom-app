@@ -18,7 +18,7 @@ LogBox.ignoreLogs([
 
 // Configure Google Sign-In
 GoogleSignin.configure({
-  webClientId: 'YOUR_WEB_CLIENT_ID', // Get from Firebase Console
+  webClientId: '1000603870908-vhc03968kr7glq65505vfs85c717gtvc.apps.googleusercontent.com', // Get from Firebase Console
 });
 
 function App(): React.JSX.Element {
