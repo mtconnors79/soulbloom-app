@@ -3,15 +3,19 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
   Alert,
   Modal,
+  Dimensions,
 } from 'react-native';
+import { LineChart, BarChart } from 'react-native-chart-kit';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { moodAPI } from '../../services/api';
+import { moodAPI, checkinAPI } from '../../services/api';
+
+const screenWidth = Dimensions.get('window').width;
 
 const MOOD_OPTIONS = [
   { value: 1.0, emoji: '😄', label: 'Amazing', color: '#10B981' },
@@ -21,39 +25,85 @@ const MOOD_OPTIONS = [
   { value: -1.0, emoji: '😢', label: 'Difficult', color: '#EF4444' },
 ];
 
+const TIMEFRAME_OPTIONS = [
+  { value: 7, label: '7 Days' },
+  { value: 14, label: '14 Days' },
+  { value: 30, label: '30 Days' },
+];
+
+const MOOD_RATING_MAP = {
+  great: { value: 5, color: '#10B981', label: 'Great' },
+  good: { value: 4, color: '#34D399', label: 'Good' },
+  okay: { value: 3, color: '#F59E0B', label: 'Okay' },
+  not_good: { value: 2, color: '#F97316', label: 'Not Good' },
+  terrible: { value: 1, color: '#EF4444', label: 'Terrible' },
+};
+
+const EMOTION_COLORS = {
+  happy: '#10B981',
+  calm: '#3B82F6',
+  energetic: '#F59E0B',
+  anxious: '#F97316',
+  stressed: '#EF4444',
+  sad: '#8B5CF6',
+  angry: '#DC2626',
+  tired: '#6B7280',
+};
+
 const MoodScreen = () => {
-  const [moods, setMoods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [stats, setStats] = useState(null);
+  const [timeframe, setTimeframe] = useState(7);
 
-  const fetchMoods = useCallback(async () => {
+  // Data states
+  const [moodStats, setMoodStats] = useState(null);
+  const [checkinStats, setCheckinStats] = useState(null);
+  const [checkins, setCheckins] = useState([]);
+  const [recentMoods, setRecentMoods] = useState([]);
+
+  const getDateRange = useCallback((days) => {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    return {
+      start_date: startDate.toISOString(),
+      end_date: endDate.toISOString(),
+    };
+  }, []);
+
+  const fetchData = useCallback(async () => {
     try {
-      const [moodsResponse, statsResponse] = await Promise.all([
-        moodAPI.list({ limit: 50 }),
-        moodAPI.stats({ days: 30 }),
+      const dateRange = getDateRange(timeframe);
+
+      const [moodStatsRes, checkinStatsRes, checkinsRes, moodsRes] = await Promise.all([
+        moodAPI.stats({ days: timeframe }),
+        checkinAPI.stats(dateRange),
+        checkinAPI.list({ ...dateRange, limit: 100 }),
+        moodAPI.list({ limit: 10 }),
       ]);
 
-      setMoods(moodsResponse.data?.moodEntries || []);
-      setStats(statsResponse.data?.stats || null);
+      setMoodStats(moodStatsRes.data?.stats || null);
+      setCheckinStats(checkinStatsRes.data?.stats || null);
+      setCheckins(checkinsRes.data?.checkins || []);
+      setRecentMoods(moodsRes.data?.moodEntries || []);
     } catch (error) {
-      console.error('Error fetching moods:', error);
+      console.error('Error fetching mood data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [timeframe, getDateRange]);
 
   useEffect(() => {
-    fetchMoods();
-  }, [fetchMoods]);
+    fetchData();
+  }, [fetchData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchMoods();
-  }, [fetchMoods]);
+    fetchData();
+  }, [fetchData]);
 
   const handleAddMood = async (moodOption) => {
     setSubmitting(true);
@@ -65,7 +115,7 @@ const MoodScreen = () => {
       });
 
       setShowAddModal(false);
-      fetchMoods();
+      fetchData();
       Alert.alert('Mood Logged', `You're feeling ${moodOption.label.toLowerCase()} today.`);
     } catch (error) {
       console.error('Error adding mood:', error);
@@ -75,127 +125,151 @@ const MoodScreen = () => {
     }
   };
 
-  const handleDeleteMood = (id) => {
-    Alert.alert(
-      'Delete Mood Entry',
-      'Are you sure you want to delete this mood entry?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await moodAPI.delete(id);
-              fetchMoods();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete mood entry.');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const getMoodEmoji = (score) => {
-    const mood = MOOD_OPTIONS.find(m => {
-      const diff = Math.abs(m.value - score);
-      return diff <= 0.25;
-    }) || MOOD_OPTIONS[2];
-    return mood;
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
+  // Process check-ins for mood trend chart
+  const getMoodTrendData = useCallback(() => {
+    if (!checkins || checkins.length === 0) {
+      return null;
     }
-    if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
+
+    // Group check-ins by date and calculate average mood
+    const moodByDate = {};
+    checkins.forEach((checkin) => {
+      const date = new Date(checkin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const moodValue = MOOD_RATING_MAP[checkin.mood_rating]?.value || 3;
+
+      if (!moodByDate[date]) {
+        moodByDate[date] = { total: 0, count: 0 };
+      }
+      moodByDate[date].total += moodValue;
+      moodByDate[date].count += 1;
+    });
+
+    const dates = Object.keys(moodByDate).slice(-7);
+    const values = dates.map((date) => moodByDate[date].total / moodByDate[date].count);
+
+    if (dates.length === 0) return null;
+
+    return {
+      labels: dates,
+      datasets: [{ data: values }],
+    };
+  }, [checkins]);
+
+  // Process check-ins for stress trend chart
+  const getStressTrendData = useCallback(() => {
+    if (!checkins || checkins.length === 0) {
+      return null;
     }
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
+
+    // Group by date and calculate average stress
+    const stressByDate = {};
+    checkins.forEach((checkin) => {
+      const date = new Date(checkin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+      if (!stressByDate[date]) {
+        stressByDate[date] = { total: 0, count: 0 };
+      }
+      stressByDate[date].total += checkin.stress_level || 5;
+      stressByDate[date].count += 1;
     });
+
+    const dates = Object.keys(stressByDate).slice(-7);
+    const values = dates.map((date) => stressByDate[date].total / stressByDate[date].count);
+
+    if (dates.length === 0) return null;
+
+    return {
+      labels: dates,
+      datasets: [{ data: values }],
+    };
+  }, [checkins]);
+
+  // Process emotion distribution for bar chart
+  const getEmotionChartData = useCallback(() => {
+    if (!checkinStats?.emotionDistribution) {
+      return null;
+    }
+
+    const emotions = Object.entries(checkinStats.emotionDistribution);
+    if (emotions.length === 0) return null;
+
+    // Sort by count and take top 6
+    emotions.sort((a, b) => b[1] - a[1]);
+    const topEmotions = emotions.slice(0, 6);
+
+    return {
+      labels: topEmotions.map(([emotion]) => emotion.charAt(0).toUpperCase() + emotion.slice(1)),
+      datasets: [{ data: topEmotions.map(([, count]) => count) }],
+      colors: topEmotions.map(([emotion]) => () => EMOTION_COLORS[emotion] || '#6B7280'),
+    };
+  }, [checkinStats]);
+
+  const getMoodColor = (avgMood) => {
+    if (avgMood >= 4) return '#10B981';
+    if (avgMood >= 3) return '#F59E0B';
+    return '#EF4444';
   };
 
-  const formatTime = (dateString) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
+  const getStressColor = (avgStress) => {
+    if (avgStress <= 3) return '#10B981';
+    if (avgStress <= 6) return '#F59E0B';
+    return '#EF4444';
+  };
+
+  const getMoodLabel = (avgMood) => {
+    if (avgMood >= 4.5) return 'Great';
+    if (avgMood >= 3.5) return 'Good';
+    if (avgMood >= 2.5) return 'Okay';
+    if (avgMood >= 1.5) return 'Not Good';
+    return 'Difficult';
+  };
+
+  const getStressLabel = (avgStress) => {
+    if (avgStress <= 3) return 'Low';
+    if (avgStress <= 6) return 'Moderate';
+    if (avgStress <= 8) return 'High';
+    return 'Very High';
+  };
+
+  // Calculate average mood from check-ins
+  const calculateAvgMood = () => {
+    if (!checkinStats?.moodDistribution) return null;
+
+    const moodDist = checkinStats.moodDistribution;
+    let totalScore = 0;
+    let totalCount = 0;
+
+    Object.entries(moodDist).forEach(([mood, count]) => {
+      totalScore += (MOOD_RATING_MAP[mood]?.value || 3) * count;
+      totalCount += count;
     });
+
+    return totalCount > 0 ? totalScore / totalCount : null;
   };
 
-  const renderMoodItem = ({ item }) => {
-    const mood = getMoodEmoji(parseFloat(item.sentiment_score));
-
-    return (
-      <TouchableOpacity
-        style={styles.moodItem}
-        onLongPress={() => handleDeleteMood(item.id)}
-      >
-        <View style={[styles.moodEmojiContainer, { backgroundColor: mood.color + '20' }]}>
-          <Text style={styles.moodEmoji}>{mood.emoji}</Text>
-        </View>
-        <View style={styles.moodContent}>
-          <Text style={styles.moodLabel}>{item.sentiment_label}</Text>
-          <Text style={styles.moodDate}>
-            {formatDate(item.check_in_date)} • {formatTime(item.created_at)}
-          </Text>
-        </View>
-        <View style={[styles.moodIndicator, { backgroundColor: mood.color }]} />
-      </TouchableOpacity>
-    );
+  const chartConfig = {
+    backgroundGradientFrom: '#fff',
+    backgroundGradientTo: '#fff',
+    color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
+    strokeWidth: 2,
+    barPercentage: 0.6,
+    useShadowColorFromDataset: false,
+    decimalPlaces: 1,
+    propsForLabels: {
+      fontSize: 10,
+    },
   };
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      {/* Stats Card */}
-      {stats && (
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>30-Day Overview</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.totalEntries || 0}</Text>
-              <Text style={styles.statLabel}>Entries</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {stats.averageScore ? (stats.averageScore > 0 ? '+' : '') + stats.averageScore.toFixed(1) : '0'}
-              </Text>
-              <Text style={styles.statLabel}>Avg Score</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, styles.statValueTrend]}>
-                {stats.trend || 'stable'}
-              </Text>
-              <Text style={styles.statLabel}>Trend</Text>
-            </View>
-          </View>
-        </View>
-      )}
+  const stressChartConfig = {
+    ...chartConfig,
+    color: (opacity = 1) => `rgba(239, 68, 68, ${opacity})`,
+  };
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent Moods</Text>
-        <Text style={styles.sectionSubtitle}>Long press to delete</Text>
-      </View>
-    </View>
-  );
-
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Icon name="happy-outline" size={64} color="#D1D5DB" />
-      <Text style={styles.emptyTitle}>No mood entries yet</Text>
-      <Text style={styles.emptySubtitle}>Start tracking how you feel each day</Text>
-    </View>
-  );
+  const moodTrendData = getMoodTrendData();
+  const stressTrendData = getStressTrendData();
+  const emotionChartData = getEmotionChartData();
+  const avgMood = calculateAvgMood();
+  const avgStress = checkinStats?.averageStressLevel;
 
   if (loading) {
     return (
@@ -207,17 +281,287 @@ const MoodScreen = () => {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={moods}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderMoodItem}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={styles.listContent}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6366F1']} />
         }
-      />
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Timeframe Toggle */}
+        <View style={styles.timeframeContainer}>
+          {TIMEFRAME_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.timeframeButton,
+                timeframe === option.value && styles.timeframeButtonActive,
+              ]}
+              onPress={() => setTimeframe(option.value)}
+            >
+              <Text
+                style={[
+                  styles.timeframeText,
+                  timeframe === option.value && styles.timeframeTextActive,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Summary Cards */}
+        <View style={styles.summaryRow}>
+          {/* Average Mood Card */}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryIconContainer}>
+              <Icon name="happy-outline" size={24} color={avgMood ? getMoodColor(avgMood) : '#6B7280'} />
+            </View>
+            <Text style={styles.summaryLabel}>Avg Mood</Text>
+            <Text style={[styles.summaryValue, { color: avgMood ? getMoodColor(avgMood) : '#6B7280' }]}>
+              {avgMood ? avgMood.toFixed(1) : '-'}
+            </Text>
+            <Text style={styles.summarySubtext}>
+              {avgMood ? getMoodLabel(avgMood) : 'No data'}
+            </Text>
+          </View>
+
+          {/* Average Stress Card */}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryIconContainer}>
+              <Icon name="pulse-outline" size={24} color={avgStress ? getStressColor(avgStress) : '#6B7280'} />
+            </View>
+            <Text style={styles.summaryLabel}>Avg Stress</Text>
+            <Text style={[styles.summaryValue, { color: avgStress ? getStressColor(avgStress) : '#6B7280' }]}>
+              {avgStress ? avgStress.toFixed(1) : '-'}
+            </Text>
+            <Text style={styles.summarySubtext}>
+              {avgStress ? getStressLabel(avgStress) : 'No data'}
+            </Text>
+          </View>
+
+          {/* Total Check-ins Card */}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryIconContainer}>
+              <Icon name="clipboard-outline" size={24} color="#6366F1" />
+            </View>
+            <Text style={styles.summaryLabel}>Check-ins</Text>
+            <Text style={[styles.summaryValue, { color: '#6366F1' }]}>
+              {checkinStats?.totalCheckins || 0}
+            </Text>
+            <Text style={styles.summarySubtext}>
+              Last {timeframe} days
+            </Text>
+          </View>
+        </View>
+
+        {/* Mood Trend Chart */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <Icon name="trending-up" size={20} color="#6366F1" />
+            <Text style={styles.chartTitle}>Mood Trend</Text>
+          </View>
+          {moodTrendData ? (
+            <LineChart
+              data={moodTrendData}
+              width={screenWidth - 48}
+              height={180}
+              chartConfig={{
+                ...chartConfig,
+                propsForDots: {
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: '#6366F1',
+                },
+              }}
+              bezier
+              style={styles.chart}
+              yAxisSuffix=""
+              yAxisInterval={1}
+              fromZero={false}
+              segments={4}
+            />
+          ) : (
+            <View style={styles.noDataContainer}>
+              <Icon name="bar-chart-outline" size={40} color="#D1D5DB" />
+              <Text style={styles.noDataText}>No mood data yet</Text>
+            </View>
+          )}
+          <View style={styles.chartLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+              <Text style={styles.legendText}>5 = Great</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
+              <Text style={styles.legendText}>3 = Okay</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+              <Text style={styles.legendText}>1 = Terrible</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Stress Level Chart */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <Icon name="pulse" size={20} color="#EF4444" />
+            <Text style={styles.chartTitle}>Stress Level Trend</Text>
+          </View>
+          {stressTrendData ? (
+            <LineChart
+              data={stressTrendData}
+              width={screenWidth - 48}
+              height={180}
+              chartConfig={{
+                ...stressChartConfig,
+                propsForDots: {
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: '#EF4444',
+                },
+              }}
+              bezier
+              style={styles.chart}
+              yAxisSuffix=""
+              yAxisInterval={1}
+              fromZero
+              segments={4}
+            />
+          ) : (
+            <View style={styles.noDataContainer}>
+              <Icon name="pulse-outline" size={40} color="#D1D5DB" />
+              <Text style={styles.noDataText}>No stress data yet</Text>
+            </View>
+          )}
+          <View style={styles.chartLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+              <Text style={styles.legendText}>1-3 Low</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
+              <Text style={styles.legendText}>4-6 Moderate</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+              <Text style={styles.legendText}>7-10 High</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Emotion Distribution Chart */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <Icon name="heart" size={20} color="#EC4899" />
+            <Text style={styles.chartTitle}>Emotion Distribution</Text>
+          </View>
+          {emotionChartData ? (
+            <BarChart
+              data={emotionChartData}
+              width={screenWidth - 48}
+              height={200}
+              chartConfig={{
+                ...chartConfig,
+                color: (opacity = 1) => `rgba(236, 72, 153, ${opacity})`,
+              }}
+              style={styles.chart}
+              showValuesOnTopOfBars
+              fromZero
+              withCustomBarColorFromData
+              flatColor
+            />
+          ) : (
+            <View style={styles.noDataContainer}>
+              <Icon name="heart-outline" size={40} color="#D1D5DB" />
+              <Text style={styles.noDataText}>No emotion data yet</Text>
+            </View>
+          )}
+          {emotionChartData && (
+            <View style={styles.emotionLegendContainer}>
+              {Object.entries(EMOTION_COLORS).slice(0, 4).map(([emotion, color]) => (
+                <View key={emotion} style={styles.emotionLegendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: color }]} />
+                  <Text style={styles.legendText}>{emotion.charAt(0).toUpperCase() + emotion.slice(1)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Mood Distribution */}
+        {checkinStats?.moodDistribution && Object.keys(checkinStats.moodDistribution).length > 0 && (
+          <View style={styles.chartCard}>
+            <View style={styles.chartHeader}>
+              <Icon name="pie-chart" size={20} color="#6366F1" />
+              <Text style={styles.chartTitle}>Mood Breakdown</Text>
+            </View>
+            <View style={styles.moodBreakdownContainer}>
+              {Object.entries(checkinStats.moodDistribution).map(([mood, count]) => {
+                const moodInfo = MOOD_RATING_MAP[mood];
+                const total = checkinStats.totalCheckins || 1;
+                const percentage = Math.round((count / total) * 100);
+
+                return (
+                  <View key={mood} style={styles.moodBreakdownItem}>
+                    <View style={styles.moodBreakdownHeader}>
+                      <Text style={styles.moodBreakdownLabel}>{moodInfo?.label || mood}</Text>
+                      <Text style={styles.moodBreakdownCount}>{count}</Text>
+                    </View>
+                    <View style={styles.moodBreakdownBarBg}>
+                      <View
+                        style={[
+                          styles.moodBreakdownBar,
+                          { width: `${percentage}%`, backgroundColor: moodInfo?.color || '#6B7280' },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.moodBreakdownPercent}>{percentage}%</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Recent Moods */}
+        {recentMoods.length > 0 && (
+          <View style={styles.chartCard}>
+            <View style={styles.chartHeader}>
+              <Icon name="time" size={20} color="#6366F1" />
+              <Text style={styles.chartTitle}>Recent Mood Logs</Text>
+            </View>
+            {recentMoods.slice(0, 5).map((mood) => {
+              const moodOption = MOOD_OPTIONS.find((m) => {
+                const diff = Math.abs(m.value - parseFloat(mood.sentiment_score));
+                return diff <= 0.25;
+              }) || MOOD_OPTIONS[2];
+
+              return (
+                <View key={mood.id} style={styles.recentMoodItem}>
+                  <View style={[styles.recentMoodEmoji, { backgroundColor: moodOption.color + '20' }]}>
+                    <Text style={styles.recentMoodEmojiText}>{moodOption.emoji}</Text>
+                  </View>
+                  <View style={styles.recentMoodContent}>
+                    <Text style={styles.recentMoodLabel}>{mood.sentiment_label}</Text>
+                    <Text style={styles.recentMoodDate}>
+                      {new Date(mood.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                  </View>
+                  <View style={[styles.recentMoodIndicator, { backgroundColor: moodOption.color }]} />
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
 
       {/* Add Mood FAB */}
       <TouchableOpacity
@@ -282,14 +626,74 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
   },
-  listContent: {
+  scrollContent: {
     padding: 16,
     paddingBottom: 100,
   },
-  header: {
+  timeframeContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  timeframeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  timeframeButtonActive: {
+    backgroundColor: '#6366F1',
+  },
+  timeframeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  timeframeTextActive: {
+    color: '#fff',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 12,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  summaryIconContainer: {
     marginBottom: 8,
   },
-  statsCard: {
+  summaryLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  summarySubtext: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  chartCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
@@ -300,111 +704,135 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  statsTitle: {
+  chartHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  chartTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 12,
+    marginLeft: 8,
   },
-  statsRow: {
-    flexDirection: 'row',
+  chart: {
+    marginVertical: 8,
+    borderRadius: 8,
+  },
+  noDataContainer: {
     alignItems: 'center',
+    paddingVertical: 40,
   },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    textTransform: 'capitalize',
-  },
-  statValueTrend: {
-    color: '#6366F1',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#E5E7EB',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  sectionSubtitle: {
-    fontSize: 12,
+  noDataText: {
+    fontSize: 14,
     color: '#9CA3AF',
+    marginTop: 8,
   },
-  moodItem: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+  chartLegend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 8,
+    gap: 16,
+  },
+  legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
   },
-  moodEmojiContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 4,
+  },
+  legendText: {
+    fontSize: 10,
+    color: '#6B7280',
+  },
+  emotionLegendContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 12,
+    gap: 12,
+  },
+  emotionLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  moodBreakdownContainer: {
+    gap: 12,
+  },
+  moodBreakdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  moodBreakdownHeader: {
+    width: 80,
+  },
+  moodBreakdownLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  moodBreakdownCount: {
+    fontSize: 10,
+    color: '#6B7280',
+  },
+  moodBreakdownBarBg: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    marginHorizontal: 8,
+    overflow: 'hidden',
+  },
+  moodBreakdownBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  moodBreakdownPercent: {
+    width: 36,
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+    textAlign: 'right',
+  },
+  recentMoodItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  recentMoodEmoji: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  moodEmoji: {
-    fontSize: 24,
+  recentMoodEmojiText: {
+    fontSize: 20,
   },
-  moodContent: {
+  recentMoodContent: {
     flex: 1,
     marginLeft: 12,
   },
-  moodLabel: {
-    fontSize: 16,
+  recentMoodLabel: {
+    fontSize: 14,
     fontWeight: '500',
     color: '#1F2937',
     textTransform: 'capitalize',
   },
-  moodDate: {
-    fontSize: 13,
+  recentMoodDate: {
+    fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
   },
-  moodIndicator: {
+  recentMoodIndicator: {
     width: 4,
-    height: 32,
+    height: 24,
     borderRadius: 2,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginTop: 4,
   },
   fab: {
     position: 'absolute',
