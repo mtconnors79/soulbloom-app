@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { checkinAPI } from '../../services/api';
 
@@ -22,22 +23,69 @@ const PROMPTS = [
   "What brought you joy recently?",
 ];
 
+const MOOD_OPTIONS = [
+  { value: 'great', label: 'Great', emoji: '😄', color: '#10B981' },
+  { value: 'good', label: 'Good', emoji: '🙂', color: '#34D399' },
+  { value: 'okay', label: 'Okay', emoji: '😐', color: '#F59E0B' },
+  { value: 'not_good', label: 'Not Good', emoji: '😔', color: '#F97316' },
+  { value: 'terrible', label: 'Terrible', emoji: '😢', color: '#EF4444' },
+];
+
+const EMOTION_TAGS = [
+  { value: 'happy', label: 'Happy', emoji: '😊' },
+  { value: 'calm', label: 'Calm', emoji: '😌' },
+  { value: 'energetic', label: 'Energetic', emoji: '⚡' },
+  { value: 'anxious', label: 'Anxious', emoji: '😰' },
+  { value: 'stressed', label: 'Stressed', emoji: '😫' },
+  { value: 'sad', label: 'Sad', emoji: '😢' },
+  { value: 'angry', label: 'Angry', emoji: '😠' },
+  { value: 'tired', label: 'Tired', emoji: '😴' },
+];
+
 const CheckInScreen = ({ navigation }) => {
+  const [moodRating, setMoodRating] = useState(null);
+  const [stressLevel, setStressLevel] = useState(5);
+  const [selectedEmotions, setSelectedEmotions] = useState([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [currentPrompt] = useState(() => PROMPTS[Math.floor(Math.random() * PROMPTS.length)]);
 
+  const toggleEmotion = (emotion) => {
+    setSelectedEmotions((prev) =>
+      prev.includes(emotion)
+        ? prev.filter((e) => e !== emotion)
+        : [...prev, emotion]
+    );
+  };
+
+  const getStressLevelLabel = (level) => {
+    if (level <= 3) return 'Low';
+    if (level <= 6) return 'Moderate';
+    if (level <= 8) return 'High';
+    return 'Very High';
+  };
+
+  const getStressLevelColor = (level) => {
+    if (level <= 3) return '#10B981';
+    if (level <= 6) return '#F59E0B';
+    if (level <= 8) return '#F97316';
+    return '#EF4444';
+  };
+
   const handleSubmit = async () => {
-    if (!text.trim()) {
-      Alert.alert('Error', 'Please write something about how you are feeling');
+    if (!moodRating) {
+      Alert.alert('Error', 'Please select your mood rating');
       return;
     }
 
     setLoading(true);
     try {
       const response = await checkinAPI.create({
+        mood_rating: moodRating,
+        stress_level: stressLevel,
+        selected_emotions: selectedEmotions,
         check_in_text: text.trim(),
         auto_analyze: true,
       });
@@ -66,8 +114,7 @@ const CheckInScreen = ({ navigation }) => {
           {
             text: 'Done',
             onPress: () => {
-              setText('');
-              setAnalysis(null);
+              resetForm();
               navigation.navigate('Home');
             },
           },
@@ -81,19 +128,31 @@ const CheckInScreen = ({ navigation }) => {
     }
   };
 
+  const resetForm = () => {
+    setMoodRating(null);
+    setStressLevel(5);
+    setSelectedEmotions([]);
+    setText('');
+    setAnalysis(null);
+  };
+
   const handleAnalyze = async () => {
-    if (!text.trim()) {
-      Alert.alert('Error', 'Please write something to analyze');
+    if (!moodRating) {
+      Alert.alert('Error', 'Please select your mood rating to analyze');
       return;
     }
 
     setAnalyzing(true);
     try {
-      const response = await checkinAPI.analyze(text.trim());
+      const response = await checkinAPI.analyze(text.trim(), {
+        mood_rating: moodRating,
+        stress_level: stressLevel,
+        selected_emotions: selectedEmotions,
+      });
       setAnalysis(response.data?.analysis || null);
     } catch (error) {
       console.error('Analysis error:', error);
-      Alert.alert('Error', 'Failed to analyze text. Please try again.');
+      Alert.alert('Error', 'Failed to analyze. Please try again.');
     } finally {
       setAnalyzing(false);
     }
@@ -135,6 +194,7 @@ const CheckInScreen = ({ navigation }) => {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {/* Prompt Card */}
         <View style={styles.promptCard}>
@@ -142,19 +202,104 @@ const CheckInScreen = ({ navigation }) => {
           <Text style={styles.promptText}>{currentPrompt}</Text>
         </View>
 
+        {/* Mood Selector */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>How are you feeling?</Text>
+          <View style={styles.moodContainer}>
+            {MOOD_OPTIONS.map((mood) => (
+              <TouchableOpacity
+                key={mood.value}
+                style={[
+                  styles.moodButton,
+                  moodRating === mood.value && { backgroundColor: mood.color + '20', borderColor: mood.color },
+                ]}
+                onPress={() => setMoodRating(mood.value)}
+              >
+                <Text style={styles.moodEmoji}>{mood.emoji}</Text>
+                <Text
+                  style={[
+                    styles.moodLabel,
+                    moodRating === mood.value && { color: mood.color, fontWeight: '600' },
+                  ]}
+                >
+                  {mood.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Stress Level Slider */}
+        <View style={styles.section}>
+          <View style={styles.stressHeader}>
+            <Text style={styles.sectionTitle}>Stress Level</Text>
+            <View style={[styles.stressLevelBadge, { backgroundColor: getStressLevelColor(stressLevel) + '20' }]}>
+              <Text style={[styles.stressLevelText, { color: getStressLevelColor(stressLevel) }]}>
+                {stressLevel}/10 - {getStressLevelLabel(stressLevel)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>1</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={1}
+              maximumValue={10}
+              step={1}
+              value={stressLevel}
+              onValueChange={setStressLevel}
+              minimumTrackTintColor={getStressLevelColor(stressLevel)}
+              maximumTrackTintColor="#E5E7EB"
+              thumbTintColor={getStressLevelColor(stressLevel)}
+            />
+            <Text style={styles.sliderLabel}>10</Text>
+          </View>
+        </View>
+
+        {/* Emotion Tags */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>What emotions are you experiencing?</Text>
+          <Text style={styles.sectionSubtitle}>Select all that apply</Text>
+          <View style={styles.emotionTagsContainer}>
+            {EMOTION_TAGS.map((emotion) => (
+              <TouchableOpacity
+                key={emotion.value}
+                style={[
+                  styles.emotionTag,
+                  selectedEmotions.includes(emotion.value) && styles.emotionTagSelected,
+                ]}
+                onPress={() => toggleEmotion(emotion.value)}
+              >
+                <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
+                <Text
+                  style={[
+                    styles.emotionLabel,
+                    selectedEmotions.includes(emotion.value) && styles.emotionLabelSelected,
+                  ]}
+                >
+                  {emotion.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         {/* Text Input */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Share your thoughts..."
-            placeholderTextColor="#9CA3AF"
-            value={text}
-            onChangeText={setText}
-            multiline
-            textAlignVertical="top"
-            maxLength={2000}
-          />
-          <Text style={styles.charCount}>{text.length}/2000</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Additional thoughts (optional)</Text>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Share more about how you're feeling..."
+              placeholderTextColor="#9CA3AF"
+              value={text}
+              onChangeText={setText}
+              multiline
+              textAlignVertical="top"
+              maxLength={2000}
+            />
+            <Text style={styles.charCount}>{text.length}/2000</Text>
+          </View>
         </View>
 
         {/* Action Buttons */}
@@ -162,7 +307,7 @@ const CheckInScreen = ({ navigation }) => {
           <TouchableOpacity
             style={[styles.analyzeButton, analyzing && styles.buttonDisabled]}
             onPress={handleAnalyze}
-            disabled={analyzing || !text.trim()}
+            disabled={analyzing || !moodRating}
           >
             {analyzing ? (
               <ActivityIndicator color="#6366F1" size="small" />
@@ -177,7 +322,7 @@ const CheckInScreen = ({ navigation }) => {
           <TouchableOpacity
             style={[styles.submitButton, loading && styles.buttonDisabled]}
             onPress={handleSubmit}
-            disabled={loading || !text.trim()}
+            disabled={loading || !moodRating}
           >
             {loading ? (
               <ActivityIndicator color="#fff" size="small" />
@@ -268,6 +413,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingBottom: 32,
   },
   promptCard: {
     backgroundColor: '#EEF2FF',
@@ -275,7 +421,7 @@ const styles = StyleSheet.create({
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   promptText: {
     flex: 1,
@@ -284,12 +430,118 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontWeight: '500',
   },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: -8,
+    marginBottom: 12,
+  },
+  moodContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  moodButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#fff',
+    flex: 1,
+    marginHorizontal: 3,
+  },
+  moodEmoji: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  moodLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  stressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  stressLevelBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  stressLevelText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  slider: {
+    flex: 1,
+    height: 40,
+    marginHorizontal: 8,
+  },
+  sliderLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  emotionTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  emotionTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#fff',
+  },
+  emotionTagSelected: {
+    backgroundColor: '#6366F1',
+    borderColor: '#6366F1',
+  },
+  emotionEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  emotionLabel: {
+    fontSize: 14,
+    color: '#4B5563',
+  },
+  emotionLabelSelected: {
+    color: '#fff',
+    fontWeight: '500',
+  },
   inputContainer: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 16,
-    minHeight: 200,
+    minHeight: 120,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -301,7 +553,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1F2937',
     lineHeight: 24,
-    minHeight: 160,
+    minHeight: 80,
   },
   charCount: {
     fontSize: 12,

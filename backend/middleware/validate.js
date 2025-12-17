@@ -153,13 +153,30 @@ const moodValidation = {
 // Check-in validations
 const checkinValidation = {
   create: [
-    body('check_in_text')
+    body('mood_rating')
       .notEmpty()
-      .withMessage('Check-in text is required')
+      .withMessage('Mood rating is required')
+      .isIn(['great', 'good', 'okay', 'not_good', 'terrible'])
+      .withMessage('Mood rating must be great, good, okay, not_good, or terrible'),
+    body('stress_level')
+      .notEmpty()
+      .withMessage('Stress level is required')
+      .isInt({ min: 1, max: 10 })
+      .withMessage('Stress level must be between 1 and 10'),
+    body('selected_emotions')
+      .optional()
+      .isArray()
+      .withMessage('Selected emotions must be an array'),
+    body('selected_emotions.*')
+      .optional()
+      .isIn(['anxious', 'calm', 'sad', 'happy', 'angry', 'tired', 'energetic', 'stressed'])
+      .withMessage('Invalid emotion value'),
+    body('check_in_text')
+      .optional()
       .isString()
       .trim()
-      .isLength({ min: 1, max: 10000 })
-      .withMessage('Check-in text must be between 1 and 10000 characters'),
+      .isLength({ max: 10000 })
+      .withMessage('Check-in text must not exceed 10000 characters'),
     body('ai_analysis')
       .optional()
       .isObject()
@@ -186,12 +203,28 @@ const checkinValidation = {
     param('id')
       .isMongoId()
       .withMessage('Valid check-in ID is required'),
+    body('mood_rating')
+      .optional()
+      .isIn(['great', 'good', 'okay', 'not_good', 'terrible'])
+      .withMessage('Mood rating must be great, good, okay, not_good, or terrible'),
+    body('stress_level')
+      .optional()
+      .isInt({ min: 1, max: 10 })
+      .withMessage('Stress level must be between 1 and 10'),
+    body('selected_emotions')
+      .optional()
+      .isArray()
+      .withMessage('Selected emotions must be an array'),
+    body('selected_emotions.*')
+      .optional()
+      .isIn(['anxious', 'calm', 'sad', 'happy', 'angry', 'tired', 'energetic', 'stressed'])
+      .withMessage('Invalid emotion value'),
     body('check_in_text')
       .optional()
       .isString()
       .trim()
-      .isLength({ min: 1, max: 10000 })
-      .withMessage('Check-in text must be between 1 and 10000 characters'),
+      .isLength({ max: 10000 })
+      .withMessage('Check-in text must not exceed 10000 characters'),
     body('ai_analysis')
       .optional()
       .isObject()

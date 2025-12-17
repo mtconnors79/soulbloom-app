@@ -120,8 +120,8 @@ export const checkinAPI = {
     api.put(`/checkins/${id}`, data),
   delete: (id) =>
     api.delete(`/checkins/${id}`),
-  analyze: (text) =>
-    api.post('/checkins/analyze', { text }),
+  analyze: (text, structuredData = {}) =>
+    api.post('/checkins/analyze', { text, ...structuredData }),
   analyzeCheckin: (id) =>
     api.post(`/checkins/${id}/analyze`),
   stats: (params) =>

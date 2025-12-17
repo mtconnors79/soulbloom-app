@@ -3,22 +3,52 @@ const sentimentService = require('../services/sentimentService');
 
 const createCheckin = async (req, res) => {
   try {
-    const { check_in_text, ai_analysis, auto_analyze = false } = req.body;
+    const {
+      mood_rating,
+      stress_level,
+      selected_emotions = [],
+      check_in_text = '',
+      ai_analysis,
+      auto_analyze = false
+    } = req.body;
     const user_id = req.user.dbId;
 
-    if (!check_in_text) {
+    // Validate required fields
+    if (!mood_rating) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'check_in_text is required'
+        message: 'mood_rating is required'
       });
     }
+
+    if (!stress_level || stress_level < 1 || stress_level > 10) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'stress_level is required and must be between 1 and 10'
+      });
+    }
+
+    const validMoods = ['great', 'good', 'okay', 'not_good', 'terrible'];
+    if (!validMoods.includes(mood_rating)) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Invalid mood_rating. Must be one of: great, good, okay, not_good, terrible'
+      });
+    }
+
+    const validEmotions = ['anxious', 'calm', 'sad', 'happy', 'angry', 'tired', 'energetic', 'stressed'];
+    const filteredEmotions = selected_emotions.filter(e => validEmotions.includes(e));
 
     let finalAnalysis = ai_analysis || null;
 
     // Auto-analyze if requested and no analysis provided
     if (auto_analyze && !ai_analysis) {
       try {
-        finalAnalysis = await sentimentService.analyzeCheckIn(check_in_text);
+        finalAnalysis = await sentimentService.analyzeCheckIn(check_in_text, {
+          mood_rating,
+          stress_level,
+          selected_emotions: filteredEmotions
+        });
       } catch (analysisError) {
         console.error('Auto-analysis failed:', analysisError.message);
         // Continue without analysis
@@ -27,6 +57,9 @@ const createCheckin = async (req, res) => {
 
     const checkin = await CheckinResponse.create({
       user_id,
+      mood_rating,
+      stress_level,
+      selected_emotions: filteredEmotions,
       check_in_text,
       ai_analysis: finalAnalysis,
       created_at: new Date()
@@ -119,16 +152,42 @@ const updateCheckin = async (req, res) => {
   try {
     const { id } = req.params;
     const user_id = req.user.dbId;
-    const { check_in_text, ai_analysis } = req.body;
+    const { mood_rating, stress_level, selected_emotions, check_in_text, ai_analysis } = req.body;
+
+    const updateFields = {};
+
+    if (mood_rating) {
+      const validMoods = ['great', 'good', 'okay', 'not_good', 'terrible'];
+      if (!validMoods.includes(mood_rating)) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid mood_rating'
+        });
+      }
+      updateFields.mood_rating = mood_rating;
+    }
+
+    if (stress_level !== undefined) {
+      if (stress_level < 1 || stress_level > 10) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'stress_level must be between 1 and 10'
+        });
+      }
+      updateFields.stress_level = stress_level;
+    }
+
+    if (selected_emotions) {
+      const validEmotions = ['anxious', 'calm', 'sad', 'happy', 'angry', 'tired', 'energetic', 'stressed'];
+      updateFields.selected_emotions = selected_emotions.filter(e => validEmotions.includes(e));
+    }
+
+    if (check_in_text !== undefined) updateFields.check_in_text = check_in_text;
+    if (ai_analysis) updateFields.ai_analysis = ai_analysis;
 
     const checkin = await CheckinResponse.findOneAndUpdate(
       { _id: id, user_id },
-      {
-        $set: {
-          ...(check_in_text && { check_in_text }),
-          ...(ai_analysis && { ai_analysis })
-        }
-      },
+      { $set: updateFields },
       { new: true }
     );
 
@@ -237,8 +296,12 @@ const analyzeCheckin = async (req, res) => {
       });
     }
 
-    // Analyze the check-in text
-    const analysis = await sentimentService.analyzeCheckIn(checkin.check_in_text);
+    // Analyze the check-in text with structured data
+    const analysis = await sentimentService.analyzeCheckIn(checkin.check_in_text, {
+      mood_rating: checkin.mood_rating,
+      stress_level: checkin.stress_level,
+      selected_emotions: checkin.selected_emotions
+    });
 
     // Update the check-in with the analysis
     checkin.ai_analysis = analysis;
@@ -265,16 +328,22 @@ const analyzeCheckin = async (req, res) => {
 
 const analyzeText = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, mood_rating, stress_level, selected_emotions } = req.body;
 
-    if (!text) {
+    // Either text or structured data is required
+    const hasStructuredData = mood_rating && stress_level;
+    if (!text && !hasStructuredData) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'text is required'
+        message: 'Either text or structured data (mood_rating, stress_level) is required'
       });
     }
 
-    const analysis = await sentimentService.analyzeCheckIn(text);
+    const analysis = await sentimentService.analyzeCheckIn(text || '', {
+      mood_rating,
+      stress_level,
+      selected_emotions: selected_emotions || []
+    });
 
     res.json({
       analysis,
@@ -315,7 +384,11 @@ const getCheckinStats = async (req, res) => {
           totalCheckins: { $sum: 1 },
           sentiments: { $push: '$ai_analysis.sentiment' },
           riskLevels: { $push: '$ai_analysis.risk_level' },
-          allKeywords: { $push: '$ai_analysis.keywords' }
+          allKeywords: { $push: '$ai_analysis.keywords' },
+          moodRatings: { $push: '$mood_rating' },
+          stressLevels: { $push: '$stress_level' },
+          allEmotions: { $push: '$selected_emotions' },
+          avgStressLevel: { $avg: '$stress_level' }
         }
       }
     ]);
@@ -326,6 +399,9 @@ const getCheckinStats = async (req, res) => {
           totalCheckins: 0,
           sentimentDistribution: {},
           riskLevelDistribution: {},
+          moodDistribution: {},
+          emotionDistribution: {},
+          averageStressLevel: 0,
           topKeywords: []
         }
       });
@@ -349,6 +425,23 @@ const getCheckinStats = async (req, res) => {
         return acc;
       }, {});
 
+    // Calculate mood distribution
+    const moodDistribution = result.moodRatings
+      .filter(m => m)
+      .reduce((acc, m) => {
+        acc[m] = (acc[m] || 0) + 1;
+        return acc;
+      }, {});
+
+    // Calculate emotion distribution
+    const emotionDistribution = result.allEmotions
+      .flat()
+      .filter(e => e)
+      .reduce((acc, e) => {
+        acc[e] = (acc[e] || 0) + 1;
+        return acc;
+      }, {});
+
     // Get top keywords
     const keywordCounts = result.allKeywords
       .flat()
@@ -368,6 +461,9 @@ const getCheckinStats = async (req, res) => {
         totalCheckins: result.totalCheckins,
         sentimentDistribution,
         riskLevelDistribution,
+        moodDistribution,
+        emotionDistribution,
+        averageStressLevel: Math.round((result.avgStressLevel || 0) * 10) / 10,
         topKeywords
       }
     });

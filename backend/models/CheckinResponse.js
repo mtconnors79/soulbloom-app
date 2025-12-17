@@ -23,9 +23,24 @@ const checkinResponseSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  mood_rating: {
+    type: String,
+    enum: ['great', 'good', 'okay', 'not_good', 'terrible'],
+    required: true
+  },
+  stress_level: {
+    type: Number,
+    min: 1,
+    max: 10,
+    required: true
+  },
+  selected_emotions: [{
+    type: String,
+    enum: ['anxious', 'calm', 'sad', 'happy', 'angry', 'tired', 'energetic', 'stressed']
+  }],
   check_in_text: {
     type: String,
-    required: true
+    default: ''
   },
   ai_analysis: {
     type: aiAnalysisSchema,
