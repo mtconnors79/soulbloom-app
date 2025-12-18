@@ -264,10 +264,10 @@ const HomeScreen = ({ navigation }) => {
           onPress={() => navigation.navigate('Mood')}
         />
         <QuickActionButton
-          icon="fitness-outline"
-          label="Activity"
-          color="#F59E0B"
-          onPress={() => {}}
+          icon="trophy-outline"
+          label="Progress"
+          color="#8B5CF6"
+          onPress={() => navigation.navigate('Progress')}
         />
         <QuickActionButton
           icon="call-outline"

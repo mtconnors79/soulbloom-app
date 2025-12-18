@@ -14,6 +14,7 @@ import HomeScreen from '../screens/main/HomeScreen';
 import CheckInScreen from '../screens/main/CheckInScreen';
 import MoodScreen from '../screens/main/MoodScreen';
 import MindfulnessScreen from '../screens/main/MindfulnessScreen';
+import ProgressScreen from '../screens/main/ProgressScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 
 const Stack = createStackNavigator();
@@ -33,6 +34,10 @@ const MoodTabIcon = ({ focused, color, size }) => (
 
 const MindfulnessTabIcon = ({ focused, color, size }) => (
   <Icon name={focused ? 'leaf' : 'leaf-outline'} size={size} color={color} />
+);
+
+const ProgressTabIcon = ({ focused, color, size }) => (
+  <Icon name={focused ? 'trophy' : 'trophy-outline'} size={size} color={color} />
 );
 
 const ProfileTabIcon = ({ focused, color, size }) => (
@@ -84,6 +89,14 @@ const MainTabNavigator = () => {
         options={{
           title: 'Mindfulness',
           tabBarIcon: MindfulnessTabIcon,
+        }}
+      />
+      <Tab.Screen
+        name="Progress"
+        component={ProgressScreen}
+        options={{
+          title: 'Progress',
+          tabBarIcon: ProgressTabIcon,
         }}
       />
       <Tab.Screen

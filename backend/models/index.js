@@ -8,6 +8,7 @@ const Profile = require('./Profile');
 const MoodEntry = require('./MoodEntry');
 const EmergencyContact = require('./EmergencyContact');
 const ActivityCompletion = require('./ActivityCompletion');
+const UserAchievement = require('./UserAchievement');
 
 // Define Sequelize Associations
 User.hasOne(Profile, { foreignKey: 'user_id', as: 'profile' });
@@ -22,6 +23,9 @@ EmergencyContact.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 User.hasMany(ActivityCompletion, { foreignKey: 'user_id', as: 'activityCompletions' });
 ActivityCompletion.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
+User.hasMany(UserAchievement, { foreignKey: 'user_id', as: 'achievements' });
+UserAchievement.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
 module.exports = {
   // MongoDB Models
   CheckinResponse,
@@ -31,5 +35,6 @@ module.exports = {
   Profile,
   MoodEntry,
   EmergencyContact,
-  ActivityCompletion
+  ActivityCompletion,
+  UserAchievement
 };

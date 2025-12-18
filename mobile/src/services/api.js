@@ -199,4 +199,17 @@ export const mindfulnessAPI = {
     api.get('/activities/mindfulness/suggested/activity', { params: { mood } }),
 };
 
+export const progressAPI = {
+  getToday: () =>
+    api.get('/progress/today'),
+  getStreaks: () =>
+    api.get('/progress/streaks'),
+  getAchievements: () =>
+    api.get('/progress/achievements'),
+  checkAchievements: () =>
+    api.post('/progress/achievements/check'),
+  getChallenges: () =>
+    api.get('/progress/challenges'),
+};
+
 export default api;

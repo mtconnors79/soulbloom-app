@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { checkinAPI } from '../../services/api';
+import { checkinAPI, progressAPI } from '../../services/api';
 import CrisisResourcesModal from '../../components/CrisisResourcesModal';
 
 const PROMPTS = [
@@ -98,6 +98,11 @@ const CheckInScreen = ({ navigation }) => {
 
       const checkinAnalysis = response.data?.checkin?.ai_analysis;
       setAnalysis(checkinAnalysis || null);
+
+      // Check for newly unlocked achievements
+      progressAPI.checkAchievements().catch(err =>
+        console.log('Achievement check:', err.message)
+      );
 
       const riskLevel = checkinAnalysis?.risk_level?.toLowerCase();
       const sentiment = checkinAnalysis?.sentiment?.toLowerCase();

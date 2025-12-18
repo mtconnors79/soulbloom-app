@@ -11,7 +11,7 @@ import {
   Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { mindfulnessAPI } from '../../services/api';
+import { mindfulnessAPI, progressAPI } from '../../services/api';
 import BreathingExerciseModal from '../../components/BreathingExerciseModal';
 
 const CATEGORY_ICONS = {
@@ -195,6 +195,11 @@ const MindfulnessScreen = () => {
       if (newStats) {
         setStats(newStats);
       }
+
+      // Check for newly unlocked achievements
+      progressAPI.checkAchievements().catch(err =>
+        console.log('Achievement check:', err.message)
+      );
 
       if (!isExternal) {
         Alert.alert(
