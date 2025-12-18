@@ -1,97 +1,265 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# MindWell Mobile App
 
-# Getting Started
+React Native application for iOS and Android.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Tech Stack
 
-## Step 1: Start Metro
+- **Framework**: React Native 0.83
+- **Navigation**: React Navigation 6 (Bottom Tabs + Stack)
+- **Authentication**: Firebase Auth with Google Sign-In
+- **Configuration**: react-native-config
+- **Icons**: react-native-vector-icons (Ionicons)
+- **Charts**: react-native-chart-kit
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Quick Start
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+### Prerequisites
+- Node.js 18+
+- Xcode 15+ (iOS)
+- Android Studio (Android)
+- CocoaPods (iOS)
 
-```sh
-# Using npm
-npm start
+### Installation
 
-# OR using Yarn
-yarn start
+```bash
+# Install dependencies
+npm install
+
+# iOS: Install CocoaPods
+cd ios && pod install && cd ..
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your values
+
+# Run iOS
+npx react-native run-ios --simulator="iPhone 16 Pro"
+
+# Run Android
+npx react-native run-android
 ```
 
-## Step 2: Build and run your app
+## Project Structure
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+```
+mobile/
+├── ios/                          # iOS native code
+├── android/                      # Android native code
+└── src/
+    ├── components/
+    │   ├── BreathingExerciseModal.js  # Animated breathing exercise
+    │   └── CrisisResourcesModal.js    # Crisis support modal
+    ├── navigation/
+    │   └── AppNavigator.js       # Tab + Stack navigation
+    ├── screens/
+    │   ├── auth/
+    │   │   ├── LoginScreen.js    # Google Sign-In
+    │   │   └── RegisterScreen.js
+    │   └── main/
+    │       ├── HomeScreen.js     # Dashboard
+    │       ├── CheckInScreen.js  # Daily check-in
+    │       ├── MoodScreen.js     # My Journey trends
+    │       ├── MindfulnessScreen.js  # Activity library
+    │       ├── ProgressScreen.js     # Achievements
+    │       └── ProfileScreen.js      # Settings
+    └── services/
+        └── api.js                # API client with interceptors
 ```
 
-### iOS
+## Screens & Navigation
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+### Bottom Tab Navigation
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+| Tab | Screen | Icon | Description |
+|-----|--------|------|-------------|
+| Home | HomeScreen | `home` | Dashboard with quick mood, suggestions |
+| Check-In | CheckInScreen | `create` | Daily structured check-in |
+| My Journey | MoodScreen | `analytics` | Mood trends and history |
+| Mindfulness | MindfulnessScreen | `leaf` | Activity library |
+| Progress | ProgressScreen | `trophy` | Goals, streaks, achievements |
+| Profile | ProfileScreen | `person` | Settings, crisis resources |
 
-```sh
-bundle install
+### Screen Details
+
+#### HomeScreen
+- Personalized greeting
+- Quick mood logging (5 emoji buttons)
+- Suggested mindfulness activity based on recent mood
+- Weekly mood summary card
+- Latest check-in preview
+- Quick action buttons grid
+
+#### CheckInScreen
+- Mood rating selector (5 options: Great to Terrible)
+- Stress level slider (1-10)
+- Emotion tag multi-select (8 emotions)
+- Free-form text input (2000 char limit)
+- AI analysis preview before saving
+- Crisis resources auto-display for high-risk entries
+
+#### MoodScreen (My Journey)
+- Time range filter (7 days, 30 days, 90 days)
+- Mood trend line chart
+- Sentiment distribution breakdown
+- Check-in history list
+- Stats summary (total entries, average, trend)
+
+#### MindfulnessScreen
+- Activity categories (expandable sections)
+- Category icons and colors
+- Activity cards with duration badges
+- BreathingExerciseModal for breathing activities
+- External links for guided meditations
+- Completion stats card (total, streak, weekly)
+
+#### ProgressScreen
+- Today's Goals: 3 circular progress rings
+- Current Streaks: 4 flame counters
+- Weekly Challenges: Progress bars
+- Achievements: Badge grid (locked/unlocked)
+- Congratulations modal for new badges
+
+#### ProfileScreen
+- User info display
+- Crisis resources access button
+- Logout functionality
+
+## Components
+
+### BreathingExerciseModal
+Full-screen modal with animated breathing guide:
+- Expanding/contracting circle animation
+- Phase indicators (Inhale, Hold, Exhale)
+- Cycle counter
+- Haptic feedback on phase changes
+- Completion callback
+
+### CrisisResourcesModal
+Support resources display:
+- Hotline numbers with tap-to-call
+- Crisis text line info
+- Acknowledgment requirement for high-risk
+- Custom alert messages
+
+## API Service
+
+Located in `src/services/api.js`:
+
+```javascript
+// Available API modules
+authAPI      // Authentication
+profileAPI   // User profile
+moodAPI      // Mood entries
+checkinAPI   // Check-ins with AI
+mindfulnessAPI  // Activities
+progressAPI  // Goals, streaks, badges
+resourcesAPI // Crisis resources
+emergencyContactAPI
+notificationAPI
 ```
 
-Then, and every time you update your native dependencies, run:
+### Features
+- Automatic Firebase token injection
+- Token refresh on 401 errors
+- Android emulator localhost handling
+- Error message formatting
 
-```sh
-bundle exec pod install
+## Environment Variables
+
+Create `.env` in the mobile directory:
+
+```env
+# Google Sign-In (from Firebase Console)
+IOS_CLIENT_ID=your-ios-client-id.apps.googleusercontent.com
+WEB_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
+
+# API Base URL
+API_BASE_URL=http://localhost:3000/api
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+### Getting Google Client IDs
 
-```sh
-# Using npm
-npm run ios
+1. Go to [Firebase Console](https://console.firebase.google.com)
+2. Select your project
+3. Authentication > Sign-in method > Google
+4. Enable Google Sign-In
+5. Copy Web Client ID
+6. For iOS Client ID, download `GoogleService-Info.plist` and find `CLIENT_ID`
 
-# OR using Yarn
-yarn ios
+## iOS Setup
+
+### GoogleService-Info.plist
+1. Download from Firebase Console
+2. Place in `ios/MindWellMobile/`
+3. Add to Xcode project
+
+### URL Schemes
+The `REVERSED_CLIENT_ID` from GoogleService-Info.plist must be added to URL schemes in Xcode.
+
+### Vector Icons
+Fonts are linked in `ios/MindWellMobile/Info.plist`:
+```xml
+<key>UIAppFonts</key>
+<array>
+    <string>Ionicons.ttf</string>
+</array>
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## Android Setup
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+### google-services.json
+1. Download from Firebase Console
+2. Place in `android/app/`
 
-## Step 3: Modify your app
+### Vector Icons
+Fonts are copied via `react-native.config.js` asset linking.
 
-Now that you have successfully run the app, let's make changes!
+## Development
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+### Start Metro Bundler
+```bash
+npx react-native start --reset-cache
+```
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+### Run on iOS
+```bash
+npx react-native run-ios
+```
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+### Run on Android
+```bash
+npx react-native run-android
+```
 
-## Congratulations! :tada:
+### Clean Build
+```bash
+# iOS
+cd ios && xcodebuild clean && pod install && cd ..
 
-You've successfully run and modified your React Native App. :partying_face:
+# Android
+cd android && ./gradlew clean && cd ..
+```
 
-### Now what?
+## Troubleshooting
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+### Metro bundler issues
+```bash
+npx react-native start --reset-cache
+```
 
-# Troubleshooting
+### iOS build fails
+```bash
+cd ios && pod deintegrate && pod install && cd ..
+```
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+### Android emulator can't reach localhost
+The API service automatically converts `localhost` to `10.0.2.2` for Android emulators.
 
-# Learn More
+### Vector icons not showing
+```bash
+# iOS
+cd ios && pod install && cd ..
 
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+# Android
+npx react-native-asset
+```

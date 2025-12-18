@@ -1,225 +1,257 @@
-# MindWell App
+# MindWell - Mental Health & Wellness App
 
-A mental health and wellness tracking application with a Node.js/Express backend.
+A comprehensive mental health tracking and wellness application built with React Native (iOS/Android) and Node.js backend.
 
 ## Features
 
-- User authentication (JWT + Firebase)
-- Mood tracking and analytics
-- Daily check-ins with AI-powered sentiment analysis
-- Activity logging (meditation, exercise, journaling, etc.)
-- Emergency contacts management
-- Push notifications via Firebase Cloud Messaging
-- Profile and preferences management
+### Daily Check-In with AI Analysis
+- Structured check-in flow with mood rating, stress level slider, and emotion tags
+- Free-form journaling with AI-powered sentiment analysis via Claude
+- Personalized supportive messages and suggestions based on entries
+- Risk level assessment for proactive mental health support
+
+### Quick Mood Logging
+- One-tap mood logging from the home screen
+- 5-point emoji scale (Great, Good, Okay, Not Great, Difficult)
+- Instant mood tracking without full check-in flow
+
+### My Journey - Mood Trends & Visualization
+- Weekly and monthly mood trend charts
+- Sentiment distribution breakdown
+- Check-in history with date range filtering
+- Track emotional patterns over time
+
+### Mindfulness Activity Library
+- **Breathing Exercises**: Box Breathing, 4-7-8 Relaxing Breath, Deep Belly Breathing with animated visual guides
+- **Grounding Techniques**: 5-4-3-2-1 Senses, Body Scan exercises
+- **Quick Resets**: 1-minute calm, Tension release exercises
+- **Guided Meditations**: Links to UCLA Mindful meditations
+- **Sleep Support**: Sleep-focused breathing and body scan
+- Activity completion tracking with streaks
+
+### Progress & Achievements
+- **Today's Goals**: Track daily check-in, mindfulness, and mood logging completion
+- **Streaks**: Maintain consecutive day streaks for each activity type
+- **Badges**: Unlock 9 achievement badges (First Steps, Week Warrior, Zen Master, etc.)
+- **Weekly Challenges**: Complete curated challenges like "Daily Calm" and "Mood Awareness"
+- Congratulations modal when unlocking new achievements
+
+### Crisis Resources (3 Access Points)
+- Automatic display for high-risk check-ins with required acknowledgment
+- "Need support?" link shown for negative sentiment entries
+- Manual access via Profile screen
+- Includes National Suicide Prevention Lifeline, Crisis Text Line, and more
+
+### User Authentication
+- Firebase Authentication with Google Sign-In
+- Secure JWT token management
+- Automatic token refresh
+- Profile management with preferences
 
 ## Tech Stack
 
-- **Backend:** Node.js, Express.js
-- **Databases:** PostgreSQL (Sequelize ORM), MongoDB (Mongoose ODM)
-- **Authentication:** JWT, Firebase Admin SDK
-- **AI:** Anthropic Claude API for sentiment analysis
-- **Push Notifications:** Firebase Cloud Messaging
+### Frontend (Mobile)
+- React Native 0.83
+- React Navigation (Bottom Tabs + Stack)
+- Firebase Auth with Google Sign-In
+- react-native-config for environment variables
+- react-native-vector-icons (Ionicons)
+- Animated API for breathing exercise visuals
 
-## Prerequisites
+### Backend
+- Node.js with Express
+- PostgreSQL (Sequelize ORM) - Users, Profiles, Mood Entries, Achievements
+- MongoDB (Mongoose) - Check-in responses, Activity logs
+- Firebase Admin SDK for token verification
+- Anthropic Claude API for sentiment analysis
 
-- Node.js v18+
-- PostgreSQL
-- MongoDB
-- Firebase project with service account
-- Anthropic API key (for sentiment analysis)
+## Project Structure
 
-## Installation
+```
+mindwell-app/
+├── backend/                 # Node.js API server
+│   ├── config/             # Database and Firebase configuration
+│   ├── controllers/        # Request handlers
+│   ├── middleware/         # Auth, rate limiting, error handling
+│   ├── models/             # Sequelize and Mongoose models
+│   ├── routes/             # API route definitions
+│   └── index.js            # Server entry point
+│
+├── mobile/                  # React Native app
+│   ├── ios/                # iOS native code
+│   ├── android/            # Android native code
+│   └── src/
+│       ├── components/     # Reusable UI components
+│       ├── navigation/     # Navigation configuration
+│       ├── screens/        # Screen components
+│       └── services/       # API client and utilities
+│
+└── README.md               # This file
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone git@github.com:mtconnors79/mindwell-app.git
-   cd mindwell-app/backend
-   ```
+## Quick Start
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 14+
+- MongoDB 6+
+- Xcode 15+ (for iOS development)
+- Android Studio (for Android development)
+- Firebase project with Authentication enabled
 
-3. **Set up environment variables**
-
-   Create a `.env` file in the `backend` directory:
-   ```env
-   PORT=3000
-   NODE_ENV=development
-
-   # PostgreSQL Database Configuration
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=mindwell_db
-   DB_USER=your_username
-   DB_PASSWORD=your_password
-
-   # MongoDB Configuration
-   MONGODB_URI=mongodb://localhost:27017/mindwell_mongo
-
-   # Firebase Configuration
-   FIREBASE_API_KEY=your_firebase_api_key
-   FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-   FIREBASE_PROJECT_ID=your-project-id
-   FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
-   FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-   FIREBASE_APP_ID=your_app_id
-   FIREBASE_MEASUREMENT_ID=your_measurement_id
-
-   # Anthropic API Configuration
-   ANTHROPIC_API_KEY=your_anthropic_api_key
-
-   # Firebase Cloud Messaging
-   FCM_ENABLED=true
-
-   # JWT Configuration
-   JWT_SECRET=your_jwt_secret_here
-   JWT_EXPIRES_IN=7d
-   ```
-
-4. **Set up Firebase Service Account**
-
-   - Go to Firebase Console > Project Settings > Service Accounts
-   - Click "Generate new private key"
-   - Save the file as `backend/config/firebase-service-account.json`
-
-5. **Set up PostgreSQL database**
-   ```bash
-   createdb mindwell_db
-   ```
-
-   The tables will be created automatically by Sequelize on first run.
-
-6. **Start MongoDB**
-   ```bash
-   brew services start mongodb-community
-   # or
-   mongod
-   ```
-
-## Running the Server
-
-**Development:**
+### 1. Clone the Repository
 ```bash
+git clone https://github.com/mtconnors79/mindwell-app.git
+cd mindwell-app
+```
+
+### 2. Backend Setup
+```bash
+cd backend
+npm install
+
+# Copy environment template and configure
+cp .env.example .env
+# Edit .env with your database credentials and API keys
+
+# Set up Firebase service account
+# Download from Firebase Console > Project Settings > Service Accounts
+# Save as backend/config/firebase-service-account.json
+
+# Start the server
 npm start
 ```
 
-The server will start on `http://localhost:3000`
-
-**Verify it's running:**
+### 3. Database Setup
 ```bash
-curl http://localhost:3000/health
+# PostgreSQL - Create database
+createdb mindwell_db
+# Tables are auto-created by Sequelize on first run
+
+# MongoDB - Start service
+brew services start mongodb-community
+# Collections are created automatically
 ```
+
+### 4. Mobile Setup
+```bash
+cd mobile
+npm install
+
+# iOS only: Install CocoaPods dependencies
+cd ios && pod install && cd ..
+
+# Copy environment template
+cp .env.example .env
+# Edit .env with your Google Sign-In client IDs and API URL
+
+# Run on iOS Simulator
+npx react-native run-ios
+
+# Run on Android Emulator
+npx react-native run-android
+```
+
+## Environment Variables
+
+### Backend (.env)
+| Variable | Description |
+|----------|-------------|
+| `PORT` | Server port (default: 3000) |
+| `NODE_ENV` | Environment (development/production) |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | PostgreSQL connection |
+| `MONGODB_URI` | MongoDB connection string |
+| `FIREBASE_*` | Firebase project configuration |
+| `ANTHROPIC_API_KEY` | Claude API key for sentiment analysis |
+| `JWT_SECRET` | Secret for JWT token signing |
+| `JWT_EXPIRES_IN` | Token expiration (default: 7d) |
+
+### Mobile (.env)
+| Variable | Description |
+|----------|-------------|
+| `IOS_CLIENT_ID` | Google Sign-In iOS client ID |
+| `WEB_CLIENT_ID` | Google Sign-In web client ID |
+| `API_BASE_URL` | Backend API URL |
 
 ## API Endpoints
 
-### Authentication
+### Authentication (`/api/auth`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/register` | Register new user |
-| POST | `/api/auth/login` | Login (returns JWT) |
-| POST | `/api/auth/register/firebase` | Register with Firebase |
-| POST | `/api/auth/login/firebase` | Login with Firebase |
-| GET | `/api/auth/me` | Get current user |
+| POST | `/register` | Register new user |
+| POST | `/login` | Login with email/password |
+| POST | `/register/firebase` | Register with Firebase token |
+| POST | `/login/firebase` | Login with Firebase token |
+| GET | `/me` | Get current user info |
 
-### Profile
+### Check-ins (`/api/checkins`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/profile` | Get user profile |
-| PUT | `/api/profile` | Update profile |
-| PUT | `/api/profile/preferences` | Update preferences |
-| DELETE | `/api/profile/preferences/:key` | Delete preference |
+| POST | `/` | Create check-in with AI analysis |
+| GET | `/` | List check-ins (paginated) |
+| GET | `/stats` | Get check-in statistics |
+| GET | `/:id` | Get single check-in |
+| PUT | `/:id` | Update check-in |
+| DELETE | `/:id` | Delete check-in |
+| POST | `/analyze` | Analyze text without saving |
 
-### Mood Entries
+### Mood (`/api/mood`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/mood` | Create mood entry |
-| GET | `/api/mood` | List mood entries |
-| GET | `/api/mood/stats` | Get mood statistics |
-| GET | `/api/mood/:id` | Get mood entry |
-| PUT | `/api/mood/:id` | Update mood entry |
-| DELETE | `/api/mood/:id` | Delete mood entry |
+| POST | `/` | Create mood entry |
+| GET | `/` | List mood entries |
+| GET | `/stats` | Get mood statistics (supports `days` param) |
+| GET | `/:id` | Get mood entry |
+| PUT | `/:id` | Update mood entry |
+| DELETE | `/:id` | Delete mood entry |
 
-### Check-ins
+### Mindfulness (`/api/activities/mindfulness`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/checkins` | Create check-in |
-| GET | `/api/checkins` | List check-ins |
-| GET | `/api/checkins/stats` | Get check-in statistics |
-| GET | `/api/checkins/:id` | Get check-in |
-| PUT | `/api/checkins/:id` | Update check-in |
-| DELETE | `/api/checkins/:id` | Delete check-in |
-| POST | `/api/checkins/analyze` | Analyze text (AI) |
-| POST | `/api/checkins/:id/analyze` | Analyze check-in (AI) |
+| GET | `/` | List all activities by category |
+| GET | `/:activityId` | Get activity details |
+| POST | `/:activityId/complete` | Mark activity complete |
+| GET | `/stats/user` | Get user's completion stats |
+| GET | `/suggested/activity` | Get suggested activity based on mood |
 
-### Activities
+### Progress (`/api/progress`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/activities` | Log activity |
-| GET | `/api/activities` | List activities |
-| GET | `/api/activities/:id` | Get activity |
-| PUT | `/api/activities/:id` | Update activity |
-| DELETE | `/api/activities/:id` | Delete activity |
+| GET | `/today` | Today's goal completion status |
+| GET | `/streaks` | Current streak counts |
+| GET | `/achievements` | All badges with unlock status |
+| POST | `/achievements/check` | Check and unlock earned badges |
+| GET | `/challenges` | Weekly challenges with progress |
 
-### Emergency Contacts
+### Resources (`/api/resources`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/emergency-contacts` | Create contact |
-| GET | `/api/emergency-contacts` | List contacts |
-| GET | `/api/emergency-contacts/:id` | Get contact |
-| PUT | `/api/emergency-contacts/:id` | Update contact |
-| DELETE | `/api/emergency-contacts/:id` | Delete contact |
+| GET | `/crisis` | Get crisis support resources |
 
-### Notifications
+### Profile (`/api/profile`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/notifications/token` | Register device token |
-| DELETE | `/api/notifications/token` | Remove device token |
-| GET | `/api/notifications/status` | Get notification status |
-| POST | `/api/notifications/test` | Send test notification |
-| POST | `/api/notifications/reminder` | Send check-in reminder |
+| GET | `/` | Get user profile |
+| PUT | `/` | Update profile |
+| PUT | `/preferences` | Update preferences |
+| DELETE | `/preferences/:key` | Delete preference |
 
-## Authentication
+### Emergency Contacts (`/api/emergency-contacts`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/` | Create contact |
+| GET | `/` | List contacts |
+| GET | `/:id` | Get contact |
+| PUT | `/:id` | Update contact |
+| DELETE | `/:id` | Delete contact |
 
-All endpoints except `/api/auth/register` and `/api/auth/login` require authentication.
-
-Include the JWT token in the Authorization header:
-```
-Authorization: Bearer <your_jwt_token>
-```
-
-## Example Usage
-
-**Register a new user:**
-```bash
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password123"}'
-```
-
-**Login:**
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password123"}'
-```
-
-**Create a check-in:**
-```bash
-curl -X POST http://localhost:3000/api/checkins \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"check_in_text":"Feeling good today!"}'
-```
-
-**Analyze text with AI:**
-```bash
-curl -X POST http://localhost:3000/api/checkins/analyze \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"text":"I am feeling happy and grateful today."}'
-```
+### Notifications (`/api/notifications`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/token` | Register device token |
+| DELETE | `/token` | Remove device token |
+| GET | `/status` | Get notification status |
+| POST | `/test` | Send test notification |
 
 ## Rate Limits
 
@@ -229,52 +261,26 @@ curl -X POST http://localhost:3000/api/checkins/analyze \
 | Authentication | 5 requests / 15 min |
 | AI Analysis | 20 requests / hour |
 | Check-in Creation | 10 requests / hour |
-| Bulk Operations | 5 requests / hour |
 
-## Project Structure
+## Mobile App Screens
 
-```
-backend/
-├── config/
-│   ├── firebase.js          # Firebase Admin SDK setup
-│   ├── mongodb.js           # MongoDB connection
-│   ├── postgres.js          # PostgreSQL connection
-│   └── sequelize.js         # Sequelize ORM setup
-├── controllers/
-│   ├── authController.js
-│   ├── profileController.js
-│   ├── moodController.js
-│   ├── checkinController.js
-│   ├── activityController.js
-│   ├── emergencyContactController.js
-│   └── notificationController.js
-├── middleware/
-│   ├── auth.js              # JWT/Firebase authentication
-│   ├── validate.js          # Input validation
-│   ├── rateLimiter.js       # Rate limiting
-│   └── errorHandler.js      # Global error handling
-├── models/
-│   ├── User.js              # PostgreSQL
-│   ├── Profile.js           # PostgreSQL
-│   ├── MoodEntry.js         # PostgreSQL
-│   ├── EmergencyContact.js  # PostgreSQL
-│   ├── CheckinResponse.js   # MongoDB
-│   └── ActivityLog.js       # MongoDB
-├── routes/
-│   ├── auth.js
-│   ├── profile.js
-│   ├── mood.js
-│   ├── checkin.js
-│   ├── activity.js
-│   ├── emergencyContact.js
-│   └── notification.js
-├── services/
-│   ├── sentimentService.js  # Claude AI integration
-│   └── notificationService.js # FCM push notifications
-├── index.js                 # App entry point
-└── package.json
-```
+| Screen | Tab | Description |
+|--------|-----|-------------|
+| Home | Home | Greeting, quick mood, suggested activity, weekly summary |
+| CheckIn | Check-In | Structured check-in flow with AI analysis |
+| Mood | My Journey | Mood trends, charts, check-in history |
+| Mindfulness | Mindfulness | Activity library with breathing exercises |
+| Progress | Progress | Today's goals, streaks, achievements, challenges |
+| Profile | Profile | User settings, crisis resources access |
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-MIT
+This project is private and not licensed for public use.
