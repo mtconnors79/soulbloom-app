@@ -166,11 +166,22 @@ const deleteMoodEntry = async (req, res) => {
 const getMoodStats = async (req, res) => {
   try {
     const user_id = req.user.dbId;
-    const { start_date, end_date } = req.query;
+    const { days, start_date, end_date } = req.query;
 
     const where = { user_id };
 
-    if (start_date || end_date) {
+    // Support 'days' parameter (e.g., days=7 for last 7 days)
+    if (days) {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - parseInt(days));
+
+      where.created_at = {
+        [Op.gte]: startDate,
+        [Op.lte]: endDate
+      };
+    } else if (start_date || end_date) {
+      // Fallback to explicit start_date/end_date
       where.check_in_date = {};
       if (start_date) where.check_in_date[Op.gte] = start_date;
       if (end_date) where.check_in_date[Op.lte] = end_date;
