@@ -81,7 +81,7 @@ const MoodScreen = () => {
         moodAPI.stats({ days: timeframe }),
         checkinAPI.stats(dateRange),
         checkinAPI.list({ ...dateRange, limit: 100 }),
-        moodAPI.list({ limit: 10 }),
+        moodAPI.list({ ...dateRange, limit: 100 }),
       ]);
 
       setMoodStats(moodStatsRes.data?.stats || null);
@@ -125,24 +125,46 @@ const MoodScreen = () => {
     }
   };
 
-  // Process check-ins for mood trend chart
+  // Process check-ins AND mood_entries for combined mood trend chart
   const getMoodTrendData = useCallback(() => {
-    if (!checkins || checkins.length === 0) {
+    const hasCheckins = checkins && checkins.length > 0;
+    const hasMoods = recentMoods && recentMoods.length > 0;
+
+    if (!hasCheckins && !hasMoods) {
       return null;
     }
 
-    // Group check-ins by date and calculate average mood
+    // Group all mood data by date and calculate average mood
     const moodByDate = {};
-    checkins.forEach((checkin) => {
-      const date = new Date(checkin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const moodValue = MOOD_RATING_MAP[checkin.mood_rating]?.value || 3;
 
-      if (!moodByDate[date]) {
-        moodByDate[date] = { total: 0, count: 0 };
-      }
-      moodByDate[date].total += moodValue;
-      moodByDate[date].count += 1;
-    });
+    // Add check-ins (mood_rating maps to 1-5 scale)
+    if (hasCheckins) {
+      checkins.forEach((checkin) => {
+        const date = new Date(checkin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const moodValue = MOOD_RATING_MAP[checkin.mood_rating]?.value || 3;
+
+        if (!moodByDate[date]) {
+          moodByDate[date] = { total: 0, count: 0 };
+        }
+        moodByDate[date].total += moodValue;
+        moodByDate[date].count += 1;
+      });
+    }
+
+    // Add quick mood logs (sentiment_score -1 to 1 maps to 1-5 scale)
+    if (hasMoods) {
+      recentMoods.forEach((mood) => {
+        const date = new Date(mood.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        // Convert sentiment_score (-1 to 1) to mood scale (1 to 5)
+        const moodValue = Math.round((parseFloat(mood.sentiment_score) + 1) * 2) + 1;
+
+        if (!moodByDate[date]) {
+          moodByDate[date] = { total: 0, count: 0 };
+        }
+        moodByDate[date].total += moodValue;
+        moodByDate[date].count += 1;
+      });
+    }
 
     const dates = Object.keys(moodByDate).slice(-7);
     const values = dates.map((date) => moodByDate[date].total / moodByDate[date].count);
@@ -153,7 +175,7 @@ const MoodScreen = () => {
       labels: dates,
       datasets: [{ data: values }],
     };
-  }, [checkins]);
+  }, [checkins, recentMoods]);
 
   // Process check-ins for stress trend chart
   const getStressTrendData = useCallback(() => {
@@ -231,18 +253,29 @@ const MoodScreen = () => {
     return 'Very High';
   };
 
-  // Calculate average mood from check-ins
+  // Calculate average mood from check-ins AND quick mood logs
   const calculateAvgMood = () => {
-    if (!checkinStats?.moodDistribution) return null;
-
-    const moodDist = checkinStats.moodDistribution;
     let totalScore = 0;
     let totalCount = 0;
 
-    Object.entries(moodDist).forEach(([mood, count]) => {
-      totalScore += (MOOD_RATING_MAP[mood]?.value || 3) * count;
-      totalCount += count;
-    });
+    // Include check-in mood data
+    if (checkinStats?.moodDistribution) {
+      const moodDist = checkinStats.moodDistribution;
+      Object.entries(moodDist).forEach(([mood, count]) => {
+        totalScore += (MOOD_RATING_MAP[mood]?.value || 3) * count;
+        totalCount += count;
+      });
+    }
+
+    // Include quick mood logs
+    if (recentMoods && recentMoods.length > 0) {
+      recentMoods.forEach((mood) => {
+        // Convert sentiment_score (-1 to 1) to mood scale (1 to 5)
+        const moodValue = Math.round((parseFloat(mood.sentiment_score) + 1) * 2) + 1;
+        totalScore += moodValue;
+        totalCount += 1;
+      });
+    }
 
     return totalCount > 0 ? totalScore / totalCount : null;
   };
@@ -341,14 +374,14 @@ const MoodScreen = () => {
             </Text>
           </View>
 
-          {/* Total Check-ins Card */}
+          {/* Total Entries Card */}
           <View style={styles.summaryCard}>
             <View style={styles.summaryIconContainer}>
               <Icon name="clipboard-outline" size={24} color="#6366F1" />
             </View>
-            <Text style={styles.summaryLabel}>Check-ins</Text>
+            <Text style={styles.summaryLabel}>Total Entries</Text>
             <Text style={[styles.summaryValue, { color: '#6366F1' }]}>
-              {checkinStats?.totalCheckins || 0}
+              {(checkinStats?.totalCheckins || 0) + (recentMoods?.length || 0)}
             </Text>
             <Text style={styles.summarySubtext}>
               Last {timeframe} days
@@ -360,7 +393,7 @@ const MoodScreen = () => {
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <Icon name="trending-up" size={20} color="#6366F1" />
-            <Text style={styles.chartTitle}>Mood Trend</Text>
+            <Text style={styles.chartTitle}>Combined Mood Trend</Text>
           </View>
           {moodTrendData ? (
             <LineChart
@@ -526,12 +559,12 @@ const MoodScreen = () => {
           </View>
         )}
 
-        {/* Recent Moods */}
+        {/* Recent Quick Moods */}
         {recentMoods.length > 0 && (
           <View style={styles.chartCard}>
             <View style={styles.chartHeader}>
               <Icon name="time" size={20} color="#6366F1" />
-              <Text style={styles.chartTitle}>Recent Mood Logs</Text>
+              <Text style={styles.chartTitle}>Recent Quick Moods</Text>
             </View>
             {recentMoods.slice(0, 5).map((mood) => {
               const moodOption = MOOD_OPTIONS.find((m) => {

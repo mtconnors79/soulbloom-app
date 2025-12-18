@@ -61,7 +61,7 @@ const MainTabNavigator = () => {
         name="CheckIn"
         component={CheckInScreen}
         options={{
-          title: 'Check In',
+          title: 'Daily Check-In',
           tabBarIcon: CheckInTabIcon,
         }}
       />
@@ -69,7 +69,7 @@ const MainTabNavigator = () => {
         name="Mood"
         component={MoodScreen}
         options={{
-          title: 'Mood History',
+          title: 'My Journey',
           tabBarIcon: MoodTabIcon,
         }}
       />

@@ -7,10 +7,19 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import auth from '@react-native-firebase/auth';
 import { moodAPI, checkinAPI } from '../../services/api';
+
+const QUICK_MOOD_OPTIONS = [
+  { emoji: '😄', label: 'great', score: 1.0, color: '#10B981' },
+  { emoji: '😊', label: 'good', score: 0.5, color: '#34D399' },
+  { emoji: '😐', label: 'okay', score: 0.0, color: '#F59E0B' },
+  { emoji: '😟', label: 'not great', score: -0.5, color: '#F97316' },
+  { emoji: '😢', label: 'difficult', score: -1.0, color: '#EF4444' },
+];
 
 const QuickActionButton = ({ icon, label, color, onPress }) => (
   <TouchableOpacity style={[styles.actionButton, { backgroundColor: color }]} onPress={onPress}>
@@ -24,6 +33,7 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [moodStats, setMoodStats] = useState(null);
   const [recentCheckin, setRecentCheckin] = useState(null);
+  const [quickMoodLoading, setQuickMoodLoading] = useState(false);
   const user = auth().currentUser;
 
   const fetchData = useCallback(async () => {
@@ -51,6 +61,24 @@ const HomeScreen = ({ navigation }) => {
     setRefreshing(true);
     fetchData();
   }, [fetchData]);
+
+  const handleQuickMood = async (moodOption) => {
+    setQuickMoodLoading(true);
+    try {
+      await moodAPI.create({
+        sentiment_score: moodOption.score,
+        sentiment_label: moodOption.label,
+        check_in_date: new Date().toISOString().split('T')[0],
+      });
+      Alert.alert('Mood Logged', `You're feeling ${moodOption.label} today.`);
+      fetchData();
+    } catch (error) {
+      console.error('Quick mood log error:', error);
+      Alert.alert('Error', 'Failed to log mood. Please try again.');
+    } finally {
+      setQuickMoodLoading(false);
+    }
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -102,7 +130,26 @@ const HomeScreen = ({ navigation }) => {
       <View style={styles.greetingSection}>
         <Text style={styles.greeting}>{getGreeting()},</Text>
         <Text style={styles.userName}>{user?.displayName || 'Friend'}</Text>
-        <Text style={styles.subtitle}>How are you feeling today?</Text>
+      </View>
+
+      {/* Quick Mood Card */}
+      <View style={styles.quickMoodCard}>
+        <Text style={styles.quickMoodTitle}>How are you feeling?</Text>
+        <View style={styles.quickMoodRow}>
+          {QUICK_MOOD_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.label}
+              style={styles.quickMoodButton}
+              onPress={() => handleQuickMood(option)}
+              disabled={quickMoodLoading}
+            >
+              <Text style={styles.quickMoodEmoji}>{option.emoji}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {quickMoodLoading && (
+          <ActivityIndicator size="small" color="#6366F1" style={styles.quickMoodLoader} />
+        )}
       </View>
 
       {/* Mood Summary Card */}
@@ -171,13 +218,13 @@ const HomeScreen = ({ navigation }) => {
       <View style={styles.actionsGrid}>
         <QuickActionButton
           icon="create-outline"
-          label="Check In"
+          label="Daily Check-In"
           color="#6366F1"
           onPress={() => navigation.navigate('CheckIn')}
         />
         <QuickActionButton
-          icon="happy-outline"
-          label="Log Mood"
+          icon="analytics-outline"
+          label="My Journey"
           color="#10B981"
           onPress={() => navigation.navigate('Mood')}
         />
@@ -221,7 +268,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   greetingSection: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   greeting: {
     fontSize: 16,
@@ -232,10 +279,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1F2937',
   },
-  subtitle: {
+  quickMoodCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  quickMoodTitle: {
     fontSize: 16,
-    color: '#6B7280',
-    marginTop: 4,
+    fontWeight: '600',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  quickMoodRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  quickMoodButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickMoodEmoji: {
+    fontSize: 28,
+  },
+  quickMoodLoader: {
+    marginTop: 12,
   },
   card: {
     backgroundColor: '#fff',
