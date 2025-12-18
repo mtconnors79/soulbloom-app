@@ -17,6 +17,7 @@ const activityRoutes = require('./routes/activity');
 const emergencyContactRoutes = require('./routes/emergencyContact');
 const profileRoutes = require('./routes/profile');
 const notificationRoutes = require('./routes/notification');
+const resourcesRoutes = require('./routes/resources');
 
 // Import error handlers
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
@@ -58,6 +59,7 @@ app.use('/api/checkins', checkinRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/emergency-contacts', emergencyContactRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/resources', resourcesRoutes);
 
 // Error handling middleware (must be after all routes)
 app.use(notFoundHandler);

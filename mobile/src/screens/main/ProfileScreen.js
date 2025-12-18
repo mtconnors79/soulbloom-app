@@ -12,6 +12,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import auth from '@react-native-firebase/auth';
 import { profileAPI, authAPI } from '../../services/api';
+import CrisisResourcesModal from '../../components/CrisisResourcesModal';
 
 const ProfileMenuItem = ({ icon, label, value, onPress, danger }) => (
   <TouchableOpacity
@@ -37,6 +38,7 @@ const ProfileScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [profile, setProfile] = useState(null);
   const [userInfo, setUserInfo] = useState(null);
+  const [showCrisisModal, setShowCrisisModal] = useState(false);
   const firebaseUser = auth().currentUser;
 
   const fetchProfile = useCallback(async () => {
@@ -105,13 +107,14 @@ const ProfileScreen = () => {
 
   const handleSupport = () => {
     Alert.alert(
-      'Need Help?',
-      'If you\'re experiencing a mental health crisis, please reach out:\n\n' +
-      '• National Suicide Prevention Lifeline: 988\n' +
-      '• Crisis Text Line: Text HOME to 741741\n\n' +
+      'App Support',
       'For app support, email: support@mindwell.app',
       [{ text: 'OK' }]
     );
+  };
+
+  const handleGetHelp = () => {
+    setShowCrisisModal(true);
   };
 
   const handleDeleteAccount = () => {
@@ -227,8 +230,14 @@ const ProfileScreen = () => {
         <Text style={styles.sectionTitle}>Support</Text>
         <View style={styles.menuCard}>
           <ProfileMenuItem
+            icon="heart-outline"
+            label="Get Help"
+            value="Crisis resources & support"
+            onPress={handleGetHelp}
+          />
+          <ProfileMenuItem
             icon="help-circle-outline"
-            label="Help & Resources"
+            label="App Support"
             onPress={handleSupport}
           />
           <ProfileMenuItem
@@ -259,6 +268,12 @@ const ProfileScreen = () => {
 
       {/* App Version */}
       <Text style={styles.version}>MindWell v1.0.0</Text>
+
+      {/* Crisis Resources Modal */}
+      <CrisisResourcesModal
+        visible={showCrisisModal}
+        onClose={() => setShowCrisisModal(false)}
+      />
     </ScrollView>
   );
 };

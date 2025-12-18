@@ -14,6 +14,7 @@ import {
 import Slider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { checkinAPI } from '../../services/api';
+import CrisisResourcesModal from '../../components/CrisisResourcesModal';
 
 const PROMPTS = [
   "How are you feeling right now?",
@@ -51,6 +52,10 @@ const CheckInScreen = ({ navigation }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [currentPrompt] = useState(() => PROMPTS[Math.floor(Math.random() * PROMPTS.length)]);
+  const [showCrisisModal, setShowCrisisModal] = useState(false);
+  const [crisisModalRequireAck, setCrisisModalRequireAck] = useState(false);
+  const [crisisAlertMessage, setCrisisAlertMessage] = useState(null);
+  const [showSupportLink, setShowSupportLink] = useState(false);
 
   const toggleEmotion = (emotion) => {
     setSelectedEmotions((prev) =>
@@ -81,6 +86,7 @@ const CheckInScreen = ({ navigation }) => {
     }
 
     setLoading(true);
+    setShowSupportLink(false);
     try {
       const response = await checkinAPI.create({
         mood_rating: moodRating,
@@ -90,18 +96,23 @@ const CheckInScreen = ({ navigation }) => {
         auto_analyze: true,
       });
 
-      if (response.data?.alert?.type === 'crisis') {
-        Alert.alert(
-          'We\'re Here For You',
-          response.data.alert.message + '\n\nCrisis Hotline: 988',
-          [
-            { text: 'I\'m Okay', style: 'cancel' },
-            { text: 'Call 988', onPress: () => {} },
-          ]
-        );
-      }
+      const checkinAnalysis = response.data?.checkin?.ai_analysis;
+      setAnalysis(checkinAnalysis || null);
 
-      setAnalysis(response.data?.checkin?.ai_analysis || null);
+      const riskLevel = checkinAnalysis?.risk_level?.toLowerCase();
+      const sentiment = checkinAnalysis?.sentiment?.toLowerCase();
+
+      // Check for critical or high risk - show modal with required acknowledgment
+      if (riskLevel === 'critical' || riskLevel === 'high') {
+        setCrisisAlertMessage(
+          "We noticed you may be struggling. Here are some resources that can help. You're not alone."
+        );
+        setCrisisModalRequireAck(true);
+        setShowCrisisModal(true);
+      } else if (sentiment === 'negative' || moodRating === 'terrible' || moodRating === 'not_good') {
+        // Show subtle support link for negative sentiment
+        setShowSupportLink(true);
+      }
 
       Alert.alert(
         'Check-in Saved',
@@ -114,8 +125,10 @@ const CheckInScreen = ({ navigation }) => {
           {
             text: 'Done',
             onPress: () => {
-              resetForm();
-              navigation.navigate('Home');
+              if (!(riskLevel === 'critical' || riskLevel === 'high')) {
+                resetForm();
+                navigation.navigate('Home');
+              }
             },
           },
         ]
@@ -134,6 +147,15 @@ const CheckInScreen = ({ navigation }) => {
     setSelectedEmotions([]);
     setText('');
     setAnalysis(null);
+    setShowSupportLink(false);
+    setCrisisAlertMessage(null);
+    setCrisisModalRequireAck(false);
+  };
+
+  const handleOpenSupport = () => {
+    setCrisisAlertMessage(null);
+    setCrisisModalRequireAck(false);
+    setShowCrisisModal(true);
   };
 
   const handleAnalyze = async () => {
@@ -401,7 +423,30 @@ const CheckInScreen = ({ navigation }) => {
             )}
           </View>
         )}
+
+        {/* Need Support Link - shown for negative sentiment */}
+        {showSupportLink && (
+          <TouchableOpacity style={styles.supportLinkContainer} onPress={handleOpenSupport}>
+            <Icon name="heart-outline" size={18} color="#6366F1" />
+            <Text style={styles.supportLinkText}>Need support? Tap here for resources</Text>
+            <Icon name="chevron-forward" size={16} color="#6366F1" />
+          </TouchableOpacity>
+        )}
       </ScrollView>
+
+      {/* Crisis Resources Modal */}
+      <CrisisResourcesModal
+        visible={showCrisisModal}
+        onClose={() => {
+          setShowCrisisModal(false);
+          if (crisisModalRequireAck) {
+            resetForm();
+            navigation.navigate('Home');
+          }
+        }}
+        requireAcknowledgment={crisisModalRequireAck}
+        alertMessage={crisisAlertMessage}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -700,6 +745,22 @@ const styles = StyleSheet.create({
     color: '#831843',
     marginLeft: 8,
     lineHeight: 20,
+  },
+  supportLinkContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 16,
+  },
+  supportLinkText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#6366F1',
+    fontWeight: '500',
+    marginLeft: 8,
   },
 });
 

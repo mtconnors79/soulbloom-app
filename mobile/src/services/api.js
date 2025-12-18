@@ -174,4 +174,9 @@ export const notificationAPI = {
     api.post('/notifications/reminder', { message }),
 };
 
+export const resourcesAPI = {
+  getCrisisResources: () =>
+    api.get('/resources/crisis'),
+};
+
 export default api;
