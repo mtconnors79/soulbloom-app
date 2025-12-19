@@ -319,7 +319,7 @@ const ProgressScreen = () => {
   );
 };
 
-const styles = StyleSheet.Create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
