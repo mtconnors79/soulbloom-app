@@ -235,8 +235,8 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.menuCard}>
           <ProfileMenuItem
             icon="heart-outline"
-            label="Get Help"
-            value="Crisis resources & support"
+            label="Crisis Resources"
+            value="Hotlines, support & help"
             onPress={handleGetHelp}
           />
           <ProfileMenuItem

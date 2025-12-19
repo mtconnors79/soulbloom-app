@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   Dimensions,
+  Switch,
 } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -32,11 +33,11 @@ const TIMEFRAME_OPTIONS = [
 ];
 
 const MOOD_RATING_MAP = {
-  great: { value: 5, color: '#10B981', label: 'Great' },
-  good: { value: 4, color: '#34D399', label: 'Good' },
-  okay: { value: 3, color: '#F59E0B', label: 'Okay' },
-  not_good: { value: 2, color: '#F97316', label: 'Not Good' },
-  terrible: { value: 1, color: '#EF4444', label: 'Terrible' },
+  great: { value: 5, color: '#10B981', label: 'Great', emoji: '😄' },
+  good: { value: 4, color: '#34D399', label: 'Good', emoji: '🙂' },
+  okay: { value: 3, color: '#F59E0B', label: 'Okay', emoji: '😐' },
+  not_good: { value: 2, color: '#F97316', label: 'Not Good', emoji: '😔' },
+  terrible: { value: 1, color: '#EF4444', label: 'Terrible', emoji: '😢' },
 };
 
 const EMOTION_COLORS = {
@@ -50,12 +51,22 @@ const EMOTION_COLORS = {
   tired: '#6B7280',
 };
 
+// Colors for different data sources
+const CHECKIN_COLOR = '#6366F1'; // Indigo for check-ins
+const QUICK_MOOD_COLOR = '#EC4899'; // Pink for quick moods
+
 const MoodScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [timeframe, setTimeframe] = useState(7);
+
+  // View mode states
+  const [detailedMoodView, setDetailedMoodView] = useState(false);
+  const [detailedStressView, setDetailedStressView] = useState(false);
+  const [showDayDetailsModal, setShowDayDetailsModal] = useState(false);
+  const [selectedDayData, setSelectedDayData] = useState(null);
 
   // Data states
   const [moodStats, setMoodStats] = useState(null);
@@ -125,8 +136,68 @@ const MoodScreen = () => {
     }
   };
 
-  // Process check-ins AND mood_entries for combined mood trend chart
-  const getMoodTrendData = useCallback(() => {
+  // Get all mood entries grouped by date for modal display
+  const getMoodEntriesByDate = useCallback(() => {
+    const entriesByDate = {};
+
+    // Add check-ins
+    if (checkins && checkins.length > 0) {
+      checkins.forEach((checkin) => {
+        const dateKey = new Date(checkin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const moodValue = MOOD_RATING_MAP[checkin.mood_rating]?.value || 3;
+        const moodInfo = MOOD_RATING_MAP[checkin.mood_rating];
+
+        if (!entriesByDate[dateKey]) {
+          entriesByDate[dateKey] = [];
+        }
+        entriesByDate[dateKey].push({
+          type: 'check-in',
+          time: new Date(checkin.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          moodValue,
+          moodLabel: moodInfo?.label || checkin.mood_rating,
+          emoji: moodInfo?.emoji || '😐',
+          color: moodInfo?.color || '#6B7280',
+          stressLevel: checkin.stress_level,
+          timestamp: new Date(checkin.created_at),
+        });
+      });
+    }
+
+    // Add quick moods
+    if (recentMoods && recentMoods.length > 0) {
+      recentMoods.forEach((mood) => {
+        const dateKey = new Date(mood.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const moodValue = Math.round((parseFloat(mood.sentiment_score) + 1) * 2) + 1;
+        const moodOption = MOOD_OPTIONS.find((m) => {
+          const diff = Math.abs(m.value - parseFloat(mood.sentiment_score));
+          return diff <= 0.25;
+        }) || MOOD_OPTIONS[2];
+
+        if (!entriesByDate[dateKey]) {
+          entriesByDate[dateKey] = [];
+        }
+        entriesByDate[dateKey].push({
+          type: 'quick-mood',
+          time: new Date(mood.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          moodValue,
+          moodLabel: mood.sentiment_label,
+          emoji: moodOption.emoji,
+          color: moodOption.color,
+          timestamp: new Date(mood.created_at),
+        });
+      });
+    }
+
+    // Sort entries within each day by timestamp
+    Object.keys(entriesByDate).forEach((date) => {
+      entriesByDate[date].sort((a, b) => a.timestamp - b.timestamp);
+    });
+
+    return entriesByDate;
+  }, [checkins, recentMoods]);
+
+  // Process mood data for summary view (daily averages)
+  const getMoodTrendDataSummary = useCallback(() => {
     const hasCheckins = checkins && checkins.length > 0;
     const hasMoods = recentMoods && recentMoods.length > 0;
 
@@ -134,10 +205,8 @@ const MoodScreen = () => {
       return null;
     }
 
-    // Group all mood data by date and calculate average mood
     const moodByDate = {};
 
-    // Add check-ins (mood_rating maps to 1-5 scale)
     if (hasCheckins) {
       checkins.forEach((checkin) => {
         const date = new Date(checkin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -151,11 +220,9 @@ const MoodScreen = () => {
       });
     }
 
-    // Add quick mood logs (sentiment_score -1 to 1 maps to 1-5 scale)
     if (hasMoods) {
       recentMoods.forEach((mood) => {
         const date = new Date(mood.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        // Convert sentiment_score (-1 to 1) to mood scale (1 to 5)
         const moodValue = Math.round((parseFloat(mood.sentiment_score) + 1) * 2) + 1;
 
         if (!moodByDate[date]) {
@@ -174,16 +241,84 @@ const MoodScreen = () => {
     return {
       labels: dates,
       datasets: [{ data: values }],
+      dateKeys: dates, // For tappable functionality
     };
   }, [checkins, recentMoods]);
 
-  // Process check-ins for stress trend chart
-  const getStressTrendData = useCallback(() => {
+  // Process mood data for detailed view (individual entries)
+  const getMoodTrendDataDetailed = useCallback(() => {
+    const hasCheckins = checkins && checkins.length > 0;
+    const hasMoods = recentMoods && recentMoods.length > 0;
+
+    if (!hasCheckins && !hasMoods) {
+      return null;
+    }
+
+    // Collect all entries with timestamps
+    const allEntries = [];
+
+    if (hasCheckins) {
+      checkins.forEach((checkin) => {
+        const moodValue = MOOD_RATING_MAP[checkin.mood_rating]?.value || 3;
+        allEntries.push({
+          timestamp: new Date(checkin.created_at),
+          value: moodValue,
+          type: 'check-in',
+        });
+      });
+    }
+
+    if (hasMoods) {
+      recentMoods.forEach((mood) => {
+        const moodValue = Math.round((parseFloat(mood.sentiment_score) + 1) * 2) + 1;
+        allEntries.push({
+          timestamp: new Date(mood.created_at),
+          value: moodValue,
+          type: 'quick-mood',
+        });
+      });
+    }
+
+    // Sort by timestamp
+    allEntries.sort((a, b) => a.timestamp - b.timestamp);
+
+    // Take last 10 entries for detailed view to avoid overcrowding
+    const recentEntries = allEntries.slice(-10);
+
+    if (recentEntries.length === 0) return null;
+
+    const labels = recentEntries.map((e) =>
+      e.timestamp.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) +
+      '\n' +
+      e.timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(' ', '')
+    );
+    const values = recentEntries.map((e) => e.value);
+    const types = recentEntries.map((e) => e.type);
+
+    return {
+      labels,
+      datasets: [{ data: values }],
+      types, // For color coding
+    };
+  }, [checkins, recentMoods]);
+
+  // Handle tapping on a summary data point
+  const handleSummaryPointTap = (dateKey) => {
+    const entriesByDate = getMoodEntriesByDate();
+    const entries = entriesByDate[dateKey];
+
+    if (entries && entries.length > 0) {
+      setSelectedDayData({ date: dateKey, entries });
+      setShowDayDetailsModal(true);
+    }
+  };
+
+  // Process stress data for summary view
+  const getStressTrendDataSummary = useCallback(() => {
     if (!checkins || checkins.length === 0) {
       return null;
     }
 
-    // Group by date and calculate average stress
     const stressByDate = {};
     checkins.forEach((checkin) => {
       const date = new Date(checkin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -206,6 +341,34 @@ const MoodScreen = () => {
     };
   }, [checkins]);
 
+  // Process stress data for detailed view
+  const getStressTrendDataDetailed = useCallback(() => {
+    if (!checkins || checkins.length === 0) {
+      return null;
+    }
+
+    // Sort by timestamp
+    const sortedCheckins = [...checkins].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    // Take last 10 entries
+    const recentCheckins = sortedCheckins.slice(-10);
+
+    if (recentCheckins.length === 0) return null;
+
+    const labels = recentCheckins.map((c) => {
+      const date = new Date(c.created_at);
+      return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) +
+        '\n' +
+        date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(' ', '');
+    });
+    const values = recentCheckins.map((c) => c.stress_level || 5);
+
+    return {
+      labels,
+      datasets: [{ data: values }],
+    };
+  }, [checkins]);
+
   // Process emotion distribution for bar chart
   const getEmotionChartData = useCallback(() => {
     if (!checkinStats?.emotionDistribution) {
@@ -215,7 +378,6 @@ const MoodScreen = () => {
     const emotions = Object.entries(checkinStats.emotionDistribution);
     if (emotions.length === 0) return null;
 
-    // Sort by count and take top 6
     emotions.sort((a, b) => b[1] - a[1]);
     const topEmotions = emotions.slice(0, 6);
 
@@ -253,12 +415,10 @@ const MoodScreen = () => {
     return 'Very High';
   };
 
-  // Calculate average mood from check-ins AND quick mood logs
   const calculateAvgMood = () => {
     let totalScore = 0;
     let totalCount = 0;
 
-    // Include check-in mood data
     if (checkinStats?.moodDistribution) {
       const moodDist = checkinStats.moodDistribution;
       Object.entries(moodDist).forEach(([mood, count]) => {
@@ -267,10 +427,8 @@ const MoodScreen = () => {
       });
     }
 
-    // Include quick mood logs
     if (recentMoods && recentMoods.length > 0) {
       recentMoods.forEach((mood) => {
-        // Convert sentiment_score (-1 to 1) to mood scale (1 to 5)
         const moodValue = Math.round((parseFloat(mood.sentiment_score) + 1) * 2) + 1;
         totalScore += moodValue;
         totalCount += 1;
@@ -289,7 +447,7 @@ const MoodScreen = () => {
     useShadowColorFromDataset: false,
     decimalPlaces: 1,
     propsForLabels: {
-      fontSize: 10,
+      fontSize: 9,
     },
   };
 
@@ -298,8 +456,8 @@ const MoodScreen = () => {
     color: (opacity = 1) => `rgba(239, 68, 68, ${opacity})`,
   };
 
-  const moodTrendData = getMoodTrendData();
-  const stressTrendData = getStressTrendData();
+  const moodTrendData = detailedMoodView ? getMoodTrendDataDetailed() : getMoodTrendDataSummary();
+  const stressTrendData = detailedStressView ? getStressTrendDataDetailed() : getStressTrendDataSummary();
   const emotionChartData = getEmotionChartData();
   const avgMood = calculateAvgMood();
   const avgStress = checkinStats?.averageStressLevel;
@@ -346,7 +504,6 @@ const MoodScreen = () => {
 
         {/* Summary Cards */}
         <View style={styles.summaryRow}>
-          {/* Average Mood Card */}
           <View style={styles.summaryCard}>
             <View style={styles.summaryIconContainer}>
               <Icon name="happy-outline" size={24} color={avgMood ? getMoodColor(avgMood) : '#6B7280'} />
@@ -360,7 +517,6 @@ const MoodScreen = () => {
             </Text>
           </View>
 
-          {/* Average Stress Card */}
           <View style={styles.summaryCard}>
             <View style={styles.summaryIconContainer}>
               <Icon name="pulse-outline" size={24} color={avgStress ? getStressColor(avgStress) : '#6B7280'} />
@@ -374,7 +530,6 @@ const MoodScreen = () => {
             </Text>
           </View>
 
-          {/* Total Entries Card */}
           <View style={styles.summaryCard}>
             <View style={styles.summaryIconContainer}>
               <Icon name="clipboard-outline" size={24} color="#6366F1" />
@@ -391,58 +546,122 @@ const MoodScreen = () => {
 
         {/* Mood Trend Chart */}
         <View style={styles.chartCard}>
-          <View style={styles.chartHeader}>
-            <Icon name="trending-up" size={20} color="#6366F1" />
-            <Text style={styles.chartTitle}>Combined Mood Trend</Text>
+          <View style={styles.chartHeaderRow}>
+            <View style={styles.chartHeader}>
+              <Icon name="trending-up" size={20} color="#6366F1" />
+              <Text style={styles.chartTitle}>Combined Mood Trend</Text>
+            </View>
+            <View style={styles.viewToggle}>
+              <Text style={styles.viewToggleLabel}>Details</Text>
+              <Switch
+                value={detailedMoodView}
+                onValueChange={setDetailedMoodView}
+                trackColor={{ false: '#E5E7EB', true: '#C7D2FE' }}
+                thumbColor={detailedMoodView ? '#6366F1' : '#9CA3AF'}
+                style={styles.switch}
+              />
+            </View>
           </View>
+
+          {!detailedMoodView && moodTrendData && (
+            <Text style={styles.chartHint}>Tap a point to see day's entries</Text>
+          )}
+
           {moodTrendData ? (
-            <LineChart
-              data={moodTrendData}
-              width={screenWidth - 48}
-              height={180}
-              chartConfig={{
-                ...chartConfig,
-                propsForDots: {
-                  r: '4',
-                  strokeWidth: '2',
-                  stroke: '#6366F1',
-                },
+            <TouchableOpacity
+              activeOpacity={detailedMoodView ? 1 : 0.7}
+              onPress={() => {
+                if (!detailedMoodView && moodTrendData.dateKeys) {
+                  // Show picker for which day to view (simplified: show most recent)
+                  const lastDate = moodTrendData.dateKeys[moodTrendData.dateKeys.length - 1];
+                  handleSummaryPointTap(lastDate);
+                }
               }}
-              bezier
-              style={styles.chart}
-              yAxisSuffix=""
-              yAxisInterval={1}
-              fromZero={false}
-              segments={4}
-            />
+            >
+              <LineChart
+                data={moodTrendData}
+                width={screenWidth - 48}
+                height={180}
+                chartConfig={{
+                  ...chartConfig,
+                  propsForDots: {
+                    r: detailedMoodView ? '5' : '6',
+                    strokeWidth: '2',
+                    stroke: '#6366F1',
+                  },
+                }}
+                bezier
+                style={styles.chart}
+                yAxisSuffix=""
+                yAxisInterval={1}
+                fromZero={false}
+                segments={4}
+                onDataPointClick={({ index }) => {
+                  if (!detailedMoodView && moodTrendData.dateKeys) {
+                    const dateKey = moodTrendData.dateKeys[index];
+                    handleSummaryPointTap(dateKey);
+                  }
+                }}
+              />
+            </TouchableOpacity>
           ) : (
             <View style={styles.noDataContainer}>
               <Icon name="bar-chart-outline" size={40} color="#D1D5DB" />
               <Text style={styles.noDataText}>No mood data yet</Text>
             </View>
           )}
+
+          {/* Legend */}
           <View style={styles.chartLegend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
-              <Text style={styles.legendText}>5 = Great</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
-              <Text style={styles.legendText}>3 = Okay</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-              <Text style={styles.legendText}>1 = Terrible</Text>
-            </View>
+            {detailedMoodView ? (
+              <>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: CHECKIN_COLOR }]} />
+                  <Text style={styles.legendText}>Check-ins</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: QUICK_MOOD_COLOR }]} />
+                  <Text style={styles.legendText}>Quick Moods</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+                  <Text style={styles.legendText}>5 = Great</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
+                  <Text style={styles.legendText}>3 = Okay</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+                  <Text style={styles.legendText}>1 = Terrible</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
         {/* Stress Level Chart */}
         <View style={styles.chartCard}>
-          <View style={styles.chartHeader}>
-            <Icon name="pulse" size={20} color="#EF4444" />
-            <Text style={styles.chartTitle}>Stress Level Trend</Text>
+          <View style={styles.chartHeaderRow}>
+            <View style={styles.chartHeader}>
+              <Icon name="pulse" size={20} color="#EF4444" />
+              <Text style={styles.chartTitle}>Stress Level Trend</Text>
+            </View>
+            <View style={styles.viewToggle}>
+              <Text style={styles.viewToggleLabel}>Details</Text>
+              <Switch
+                value={detailedStressView}
+                onValueChange={setDetailedStressView}
+                trackColor={{ false: '#E5E7EB', true: '#FECACA' }}
+                thumbColor={detailedStressView ? '#EF4444' : '#9CA3AF'}
+                style={styles.switch}
+              />
+            </View>
           </View>
+
           {stressTrendData ? (
             <LineChart
               data={stressTrendData}
@@ -451,7 +670,7 @@ const MoodScreen = () => {
               chartConfig={{
                 ...stressChartConfig,
                 propsForDots: {
-                  r: '4',
+                  r: detailedStressView ? '5' : '6',
                   strokeWidth: '2',
                   stroke: '#EF4444',
                 },
@@ -644,6 +863,71 @@ const MoodScreen = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Day Details Modal */}
+      <Modal
+        visible={showDayDetailsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDayDetailsModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDayDetailsModal(false)}
+        >
+          <View style={styles.dayDetailsModal} onStartShouldSetResponder={() => true}>
+            <View style={styles.dayDetailsHeader}>
+              <Text style={styles.dayDetailsTitle}>{selectedDayData?.date}</Text>
+              <Text style={styles.dayDetailsSubtitle}>
+                {selectedDayData?.entries?.length || 0} {selectedDayData?.entries?.length === 1 ? 'entry' : 'entries'}
+              </Text>
+            </View>
+
+            <ScrollView style={styles.dayDetailsList} showsVerticalScrollIndicator={false}>
+              {selectedDayData?.entries?.map((entry, index) => (
+                <View key={index} style={styles.dayDetailsItem}>
+                  <View style={styles.dayDetailsLeft}>
+                    <View style={[styles.dayDetailsEmoji, { backgroundColor: entry.color + '20' }]}>
+                      <Text style={styles.dayDetailsEmojiText}>{entry.emoji}</Text>
+                    </View>
+                    <View style={styles.dayDetailsInfo}>
+                      <View style={styles.dayDetailsLabelRow}>
+                        <Text style={styles.dayDetailsLabel}>{entry.moodLabel}</Text>
+                        <View style={[
+                          styles.sourceTag,
+                          { backgroundColor: entry.type === 'check-in' ? CHECKIN_COLOR + '20' : QUICK_MOOD_COLOR + '20' }
+                        ]}>
+                          <Text style={[
+                            styles.sourceTagText,
+                            { color: entry.type === 'check-in' ? CHECKIN_COLOR : QUICK_MOOD_COLOR }
+                          ]}>
+                            {entry.type === 'check-in' ? 'Check-in' : 'Quick Mood'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.dayDetailsTime}>{entry.time}</Text>
+                      {entry.stressLevel && (
+                        <Text style={styles.dayDetailsStress}>Stress: {entry.stressLevel}/10</Text>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={[styles.dayDetailsMoodValue, { color: entry.color }]}>
+                    {entry.moodValue}/5
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.dayDetailsClose}
+              onPress={() => setShowDayDetailsModal(false)}
+            >
+              <Text style={styles.dayDetailsCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -737,16 +1021,39 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  chartHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   chartHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
   },
   chartTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
     marginLeft: 8,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewToggleLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginRight: 6,
+  },
+  switch: {
+    transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
+  },
+  chartHint: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    marginBottom: 8,
   },
   chart: {
     marginVertical: 8,
@@ -932,6 +1239,108 @@ const styles = StyleSheet.create({
   },
   modalLoader: {
     marginTop: 16,
+  },
+  // Day Details Modal Styles
+  dayDetailsModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '70%',
+  },
+  dayDetailsHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  dayDetailsTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  dayDetailsSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  dayDetailsList: {
+    maxHeight: 300,
+  },
+  dayDetailsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dayDetailsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dayDetailsEmoji: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayDetailsEmojiText: {
+    fontSize: 22,
+  },
+  dayDetailsInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  dayDetailsLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  dayDetailsLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+    textTransform: 'capitalize',
+  },
+  sourceTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  sourceTagText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  dayDetailsTime: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  dayDetailsStress: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  dayDetailsMoodValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  dayDetailsClose: {
+    backgroundColor: '#6366F1',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 20,
+  },
+  dayDetailsCloseText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
 
