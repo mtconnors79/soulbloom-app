@@ -54,13 +54,14 @@ const CheckInScreen = ({ navigation }) => {
   const [selectedEmotions, setSelectedEmotions] = useState([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState(null);
   const [currentPrompt] = useState(() => PROMPTS[Math.floor(Math.random() * PROMPTS.length)]);
   const [showCrisisModal, setShowCrisisModal] = useState(false);
   const [crisisModalRequireAck, setCrisisModalRequireAck] = useState(false);
   const [crisisAlertMessage, setCrisisAlertMessage] = useState(null);
-  const [showSupportLink, setShowSupportLink] = useState(false);
+
+  // Analysis results modal state
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState(null);
 
   // Resource suggestion modal state
   const [showResourceModal, setShowResourceModal] = useState(false);
@@ -122,7 +123,6 @@ const CheckInScreen = ({ navigation }) => {
     }
 
     setLoading(true);
-    setShowSupportLink(false);
     try {
       const response = await checkinAPI.create({
         mood_rating: moodRating,
@@ -133,7 +133,7 @@ const CheckInScreen = ({ navigation }) => {
       });
 
       const checkinAnalysis = response.data?.checkin?.ai_analysis;
-      setAnalysis(checkinAnalysis || null);
+      setAnalysisResults(checkinAnalysis || null);
 
       // Check for newly unlocked achievements
       progressAPI.checkAchievements().catch(err =>
@@ -141,10 +141,9 @@ const CheckInScreen = ({ navigation }) => {
       );
 
       const riskLevel = checkinAnalysis?.risk_level?.toLowerCase();
-      const sentiment = checkinAnalysis?.sentiment?.toLowerCase();
       const detectedTopics = checkinAnalysis?.detected_topics;
 
-      // Check for critical or high risk - show modal with required acknowledgment
+      // Check for critical or high risk - show crisis modal with required acknowledgment
       if (riskLevel === 'critical' || riskLevel === 'high') {
         setCrisisAlertMessage(
           "We noticed you may be struggling. Here are some resources that can help. You're not alone."
@@ -155,30 +154,10 @@ const CheckInScreen = ({ navigation }) => {
         // Show contextual resource suggestion for detected topics
         setDetectedTopic(detectedTopics[0]); // Show first detected topic
         setShowResourceModal(true);
-      } else if (sentiment === 'negative' || moodRating === 'terrible' || moodRating === 'not_good') {
-        // Show subtle support link for negative sentiment
-        setShowSupportLink(true);
+      } else {
+        // Show analysis results modal for normal check-ins
+        setShowAnalysisModal(true);
       }
-
-      Alert.alert(
-        'Check-in Saved',
-        'Your check-in has been recorded. Take care of yourself!',
-        [
-          {
-            text: 'View Analysis',
-            onPress: () => {},
-          },
-          {
-            text: 'Done',
-            onPress: () => {
-              if (!(riskLevel === 'critical' || riskLevel === 'high')) {
-                resetForm();
-                navigation.navigate('Home');
-              }
-            },
-          },
-        ]
-      );
     } catch (error) {
       console.error('Check-in error:', error);
       Alert.alert('Error', error.message || 'Failed to save check-in. Please try again.');
@@ -192,12 +171,24 @@ const CheckInScreen = ({ navigation }) => {
     setStressLevel(5);
     setSelectedEmotions([]);
     setText('');
-    setAnalysis(null);
-    setShowSupportLink(false);
+    setAnalysisResults(null);
     setCrisisAlertMessage(null);
     setCrisisModalRequireAck(false);
     setDetectedTopic(null);
     setDontShowResourceSuggestions(false);
+  };
+
+  const handleAnalysisModalDismiss = () => {
+    setShowAnalysisModal(false);
+    resetForm();
+    navigation.navigate('Home');
+  };
+
+  const handleOpenSupport = () => {
+    setShowAnalysisModal(false);
+    setCrisisAlertMessage(null);
+    setCrisisModalRequireAck(false);
+    setShowCrisisModal(true);
   };
 
   const handleResourceModalClose = () => {
@@ -207,6 +198,8 @@ const CheckInScreen = ({ navigation }) => {
     setShowResourceModal(false);
     setDetectedTopic(null);
     setDontShowResourceSuggestions(false);
+    resetForm();
+    navigation.navigate('Home');
   };
 
   const handleCallResource = (phone) => {
@@ -240,34 +233,6 @@ const CheckInScreen = ({ navigation }) => {
           Alert.alert('Error', 'Unable to open messaging app');
         });
       }
-    }
-  };
-
-  const handleOpenSupport = () => {
-    setCrisisAlertMessage(null);
-    setCrisisModalRequireAck(false);
-    setShowCrisisModal(true);
-  };
-
-  const handleAnalyze = async () => {
-    if (!moodRating) {
-      Alert.alert('Error', 'Please select your mood rating to analyze');
-      return;
-    }
-
-    setAnalyzing(true);
-    try {
-      const response = await checkinAPI.analyze(text.trim(), {
-        mood_rating: moodRating,
-        stress_level: stressLevel,
-        selected_emotions: selectedEmotions,
-      });
-      setAnalysis(response.data?.analysis || null);
-    } catch (error) {
-      console.error('Analysis error:', error);
-      Alert.alert('Error', 'Failed to analyze. Please try again.');
-    } finally {
-      setAnalyzing(false);
     }
   };
 
@@ -415,114 +380,22 @@ const CheckInScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[styles.analyzeButton, analyzing && styles.buttonDisabled]}
-            onPress={handleAnalyze}
-            disabled={analyzing || !moodRating}
-          >
-            {analyzing ? (
-              <ActivityIndicator color="#6366F1" size="small" />
-            ) : (
-              <>
-                <Icon name="sparkles" size={18} color="#6366F1" />
-                <Text style={styles.analyzeButtonText}>Analyze</Text>
-              </>
-            )}
-          </TouchableOpacity>
+        {/* Save Button */}
+        <TouchableOpacity
+          style={[styles.submitButton, loading && styles.buttonDisabled]}
+          onPress={handleSubmit}
+          disabled={loading || !moodRating}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Icon name="checkmark-circle" size={20} color="#fff" />
+              <Text style={styles.submitButtonText}>Save Check-in</Text>
+            </>
+          )}
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.buttonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading || !moodRating}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Icon name="checkmark-circle" size={18} color="#fff" />
-                <Text style={styles.submitButtonText}>Save Check-in</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Analysis Results */}
-        {analysis && (
-          <View style={styles.analysisCard}>
-            <View style={styles.analysisHeader}>
-              <Icon name="analytics" size={24} color="#6366F1" />
-              <Text style={styles.analysisTitle}>Analysis</Text>
-            </View>
-
-            {/* Sentiment */}
-            <View style={styles.analysisRow}>
-              <Text style={styles.analysisLabel}>Sentiment:</Text>
-              <View style={[styles.badge, { backgroundColor: getSentimentColor(analysis.sentiment) + '20' }]}>
-                <Text style={[styles.badgeText, { color: getSentimentColor(analysis.sentiment) }]}>
-                  {analysis.sentiment || 'Unknown'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Risk Level */}
-            {analysis.risk_level && (
-              <View style={styles.analysisRow}>
-                <Text style={styles.analysisLabel}>Risk Level:</Text>
-                <View style={[styles.badge, { backgroundColor: getRiskColor(analysis.risk_level) + '20' }]}>
-                  <Text style={[styles.badgeText, { color: getRiskColor(analysis.risk_level) }]}>
-                    {analysis.risk_level}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Emotions */}
-            {analysis.emotions?.length > 0 && (
-              <View style={styles.analysisSection}>
-                <Text style={styles.analysisLabel}>Emotions detected:</Text>
-                <View style={styles.tagsContainer}>
-                  {analysis.emotions.map((emotion, index) => (
-                    <View key={index} style={styles.tag}>
-                      <Text style={styles.tagText}>{emotion}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Suggestions */}
-            {analysis.suggestions?.length > 0 && (
-              <View style={styles.suggestionsSection}>
-                <Text style={styles.suggestionsTitle}>Suggestions:</Text>
-                {analysis.suggestions.map((suggestion, index) => (
-                  <View key={index} style={styles.suggestionItem}>
-                    <Icon name="bulb-outline" size={16} color="#F59E0B" />
-                    <Text style={styles.suggestionText}>{suggestion}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Supportive Message */}
-            {analysis.supportive_message && (
-              <View style={styles.messageCard}>
-                <Icon name="heart" size={20} color="#EC4899" />
-                <Text style={styles.messageText}>{analysis.supportive_message}</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Need Support Link - shown for negative sentiment */}
-        {showSupportLink && (
-          <TouchableOpacity style={styles.supportLinkContainer} onPress={handleOpenSupport}>
-            <Icon name="heart-outline" size={18} color="#6366F1" />
-            <Text style={styles.supportLinkText}>Need support? Tap here for resources</Text>
-            <Icon name="chevron-forward" size={16} color="#6366F1" />
-          </TouchableOpacity>
-        )}
       </ScrollView>
 
       {/* Crisis Resources Modal */}
@@ -538,6 +411,106 @@ const CheckInScreen = ({ navigation }) => {
         requireAcknowledgment={crisisModalRequireAck}
         alertMessage={crisisAlertMessage}
       />
+
+      {/* Analysis Results Modal */}
+      <Modal
+        visible={showAnalysisModal}
+        transparent
+        animationType="slide"
+        onRequestClose={handleAnalysisModalDismiss}
+      >
+        <View style={styles.analysisModalOverlay}>
+          <View style={styles.analysisModalContent}>
+            {/* Success Header */}
+            <View style={styles.analysisModalHeader}>
+              <View style={styles.analysisSuccessIcon}>
+                <Icon name="checkmark-circle" size={40} color="#10B981" />
+              </View>
+              <Text style={styles.analysisModalTitle}>Check-in Saved!</Text>
+              <Text style={styles.analysisModalSubtitle}>Here's what we noticed</Text>
+            </View>
+
+            <ScrollView style={styles.analysisModalScroll} showsVerticalScrollIndicator={false}>
+              {/* Supportive Message - shown first and prominently */}
+              {analysisResults?.supportive_message && (
+                <View style={styles.supportiveMessageCard}>
+                  <Icon name="heart" size={22} color="#EC4899" />
+                  <Text style={styles.supportiveMessageText}>
+                    {analysisResults.supportive_message}
+                  </Text>
+                </View>
+              )}
+
+              {/* Sentiment & Risk Row */}
+              <View style={styles.analysisMetricsRow}>
+                <View style={styles.analysisMetricItem}>
+                  <Text style={styles.analysisMetricLabel}>Mood</Text>
+                  <View style={[styles.analysisMetricBadge, { backgroundColor: getSentimentColor(analysisResults?.sentiment) + '20' }]}>
+                    <Text style={[styles.analysisMetricValue, { color: getSentimentColor(analysisResults?.sentiment) }]}>
+                      {analysisResults?.sentiment || 'Neutral'}
+                    </Text>
+                  </View>
+                </View>
+                {analysisResults?.risk_level && (
+                  <View style={styles.analysisMetricItem}>
+                    <Text style={styles.analysisMetricLabel}>Wellness</Text>
+                    <View style={[styles.analysisMetricBadge, { backgroundColor: getRiskColor(analysisResults?.risk_level) + '20' }]}>
+                      <Text style={[styles.analysisMetricValue, { color: getRiskColor(analysisResults?.risk_level) }]}>
+                        {analysisResults.risk_level}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Emotions detected */}
+              {analysisResults?.emotions?.length > 0 && (
+                <View style={styles.analysisEmotionsSection}>
+                  <Text style={styles.analysisSectionLabel}>Emotions detected</Text>
+                  <View style={styles.analysisEmotionTags}>
+                    {analysisResults.emotions.map((emotion, index) => (
+                      <View key={index} style={styles.analysisEmotionTag}>
+                        <Text style={styles.analysisEmotionText}>{emotion}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Suggestions */}
+              {analysisResults?.suggestions?.length > 0 && (
+                <View style={styles.analysisSuggestionsSection}>
+                  <Text style={styles.analysisSectionLabel}>Suggestions for you</Text>
+                  {analysisResults.suggestions.map((suggestion, index) => (
+                    <View key={index} style={styles.analysisSuggestionItem}>
+                      <Icon name="bulb-outline" size={18} color="#F59E0B" />
+                      <Text style={styles.analysisSuggestionText}>{suggestion}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Support link for negative sentiment */}
+              {(analysisResults?.sentiment?.toLowerCase() === 'negative' ||
+                moodRating === 'terrible' || moodRating === 'not_good') && (
+                <TouchableOpacity style={styles.analysisSupportLink} onPress={handleOpenSupport}>
+                  <Icon name="heart-outline" size={18} color="#6366F1" />
+                  <Text style={styles.analysisSupportLinkText}>Need support? Tap for resources</Text>
+                  <Icon name="chevron-forward" size={16} color="#6366F1" />
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+
+            {/* Done Button */}
+            <TouchableOpacity
+              style={styles.analysisDoneButton}
+              onPress={handleAnalysisModalDismiss}
+            >
+              <Text style={styles.analysisDoneButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Contextual Resource Suggestion Modal */}
       <Modal
@@ -801,36 +774,14 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 8,
   },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  analyzeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: '#6366F1',
-  },
-  analyzeButtonText: {
-    color: '#6366F1',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
   submitButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#6366F1',
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 16,
+    marginBottom: 16,
   },
   submitButtonText: {
     color: '#fff',
@@ -841,121 +792,154 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
-  analysisCard: {
+  // Analysis Results Modal Styles
+  analysisModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  analysisModalContent: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+    maxHeight: '85%',
   },
-  analysisHeader: {
-    flexDirection: 'row',
+  analysisModalHeader: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  analysisTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginLeft: 8,
-  },
-  analysisRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  analysisSuccessIcon: {
     marginBottom: 12,
   },
-  analysisLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginRight: 8,
+  analysisModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
   },
-  badge: {
+  analysisModalSubtitle: {
+    fontSize: 15,
+    color: '#6B7280',
+  },
+  analysisModalScroll: {
+    marginBottom: 16,
+  },
+  supportiveMessageCard: {
+    backgroundColor: '#FDF2F8',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  supportiveMessageText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#831843',
+    marginLeft: 10,
+    lineHeight: 22,
+  },
+  analysisMetricsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  analysisMetricItem: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  analysisMetricLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  analysisMetricBadge: {
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  badgeText: {
+  analysisMetricValue: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     textTransform: 'capitalize',
   },
-  analysisSection: {
-    marginBottom: 12,
+  analysisEmotionsSection: {
+    marginBottom: 20,
   },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-    gap: 8,
-  },
-  tag: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  tagText: {
-    fontSize: 13,
-    color: '#4B5563',
-    textTransform: 'capitalize',
-  },
-  suggestionsSection: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  suggestionsTitle: {
+  analysisSectionLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 12,
-  },
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     marginBottom: 10,
   },
-  suggestionText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#4B5563',
-    marginLeft: 8,
-    lineHeight: 20,
+  analysisEmotionTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  messageCard: {
-    backgroundColor: '#FDF2F8',
+  analysisEmotionTag: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  analysisEmotionText: {
+    fontSize: 13,
+    color: '#4F46E5',
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  analysisSuggestionsSection: {
+    backgroundColor: '#FFFBEB',
     borderRadius: 12,
-    padding: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  analysisSuggestionItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginTop: 16,
+    marginTop: 8,
   },
-  messageText: {
+  analysisSuggestionText: {
     flex: 1,
     fontSize: 14,
-    color: '#831843',
+    color: '#92400E',
     marginLeft: 8,
     lineHeight: 20,
   },
-  supportLinkContainer: {
+  analysisSupportLink: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#EEF2FF',
     borderRadius: 12,
     padding: 14,
-    marginTop: 16,
+    marginTop: 4,
   },
-  supportLinkText: {
+  analysisSupportLinkText: {
     flex: 1,
     fontSize: 14,
     color: '#6366F1',
     fontWeight: '500',
     marginLeft: 8,
+  },
+  analysisDoneButton: {
+    backgroundColor: '#6366F1',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  analysisDoneButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   // Resource Suggestion Modal Styles
   resourceModalOverlay: {
