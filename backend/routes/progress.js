@@ -125,7 +125,7 @@ router.get('/today', authenticate, async (req, res) => {
 
     // Check for today's check-in (MongoDB)
     const todayCheckin = await CheckinResponse.findOne({
-      firebase_uid: req.user.uid,
+      user_id: req.user.dbId,
       created_at: { $gte: startOfToday, $lt: endOfToday }
     });
 
@@ -165,10 +165,9 @@ router.get('/today', authenticate, async (req, res) => {
 router.get('/streaks', authenticate, async (req, res) => {
   try {
     const user_id = req.user.dbId;
-    const firebase_uid = req.user.uid;
 
     // Calculate check-in streak
-    const checkinStreak = await calculateCheckinStreak(firebase_uid);
+    const checkinStreak = await calculateCheckinStreak(user_id);
 
     // Calculate mindfulness streak
     const mindfulnessStreak = await calculateMindfulnessStreak(user_id);
@@ -195,7 +194,7 @@ router.get('/streaks', authenticate, async (req, res) => {
 });
 
 // Helper function to calculate check-in streak
-async function calculateCheckinStreak(firebase_uid) {
+async function calculateCheckinStreak(user_id) {
   let streak = 0;
   let currentDate = getStartOfToday();
 
@@ -204,7 +203,7 @@ async function calculateCheckinStreak(firebase_uid) {
     nextDate.setUTCDate(nextDate.getUTCDate() + 1);
 
     const hasCheckin = await CheckinResponse.findOne({
-      firebase_uid,
+      user_id,
       created_at: { $gte: currentDate, $lt: nextDate }
     });
 
@@ -218,7 +217,7 @@ async function calculateCheckinStreak(firebase_uid) {
       nextDateYesterday.setUTCDate(nextDateYesterday.getUTCDate() + 1);
 
       const hadCheckinYesterday = await CheckinResponse.findOne({
-        firebase_uid,
+        user_id,
         created_at: { $gte: currentDate, $lt: nextDateYesterday }
       });
 
@@ -373,7 +372,6 @@ router.get('/achievements', authenticate, async (req, res) => {
 router.post('/achievements/check', authenticate, async (req, res) => {
   try {
     const user_id = req.user.dbId;
-    const firebase_uid = req.user.uid;
 
     // Get already unlocked badges
     const existingAchievements = await UserAchievement.findAll({
@@ -386,7 +384,7 @@ router.post('/achievements/check', authenticate, async (req, res) => {
     // Check each badge
     // first_checkin: Complete your first check-in
     if (!unlockedBadges.has('first_checkin')) {
-      const checkinCount = await CheckinResponse.countDocuments({ firebase_uid });
+      const checkinCount = await CheckinResponse.countDocuments({ user_id });
       if (checkinCount >= 1) {
         newlyUnlocked.push('first_checkin');
       }
@@ -394,7 +392,7 @@ router.post('/achievements/check', authenticate, async (req, res) => {
 
     // week_one: Use the app for 7 days
     if (!unlockedBadges.has('week_one')) {
-      const uniqueDays = await getUniqueDaysUsed(user_id, firebase_uid);
+      const uniqueDays = await getUniqueDaysUsed(user_id);
       if (uniqueDays >= 7) {
         newlyUnlocked.push('week_one');
       }
@@ -402,7 +400,7 @@ router.post('/achievements/check', authenticate, async (req, res) => {
 
     // streak_7: Maintain a 7-day check-in streak
     if (!unlockedBadges.has('streak_7')) {
-      const streak = await calculateCheckinStreak(firebase_uid);
+      const streak = await calculateCheckinStreak(user_id);
       if (streak >= 7) {
         newlyUnlocked.push('streak_7');
       }
@@ -410,7 +408,7 @@ router.post('/achievements/check', authenticate, async (req, res) => {
 
     // streak_30: Maintain a 30-day check-in streak
     if (!unlockedBadges.has('streak_30')) {
-      const streak = await calculateCheckinStreak(firebase_uid);
+      const streak = await calculateCheckinStreak(user_id);
       if (streak >= 30) {
         newlyUnlocked.push('streak_30');
       }
@@ -455,11 +453,11 @@ router.post('/achievements/check', authenticate, async (req, res) => {
 
     // words_500: Write 500+ words in check-in notes
     if (!unlockedBadges.has('words_500')) {
-      const checkins = await CheckinResponse.find({ firebase_uid });
+      const checkins = await CheckinResponse.find({ user_id });
       let totalWords = 0;
       checkins.forEach(checkin => {
-        if (checkin.notes) {
-          totalWords += checkin.notes.split(/\s+/).filter(Boolean).length;
+        if (checkin.check_in_text) {
+          totalWords += checkin.check_in_text.split(/\s+/).filter(Boolean).length;
         }
       });
       if (totalWords >= 500) {
@@ -492,11 +490,11 @@ router.post('/achievements/check', authenticate, async (req, res) => {
 });
 
 // Helper function to count unique days the app was used
-async function getUniqueDaysUsed(user_id, firebase_uid) {
+async function getUniqueDaysUsed(user_id) {
   const days = new Set();
 
   // Check-ins from MongoDB
-  const checkins = await CheckinResponse.find({ firebase_uid });
+  const checkins = await CheckinResponse.find({ user_id });
   checkins.forEach(c => {
     if (c.created_at) {
       days.add(c.created_at.toISOString().split('T')[0]);
@@ -526,7 +524,6 @@ async function getUniqueDaysUsed(user_id, firebase_uid) {
 router.get('/challenges', authenticate, async (req, res) => {
   try {
     const user_id = req.user.dbId;
-    const firebase_uid = req.user.uid;
     const weekStart = getDaysAgo(7);
 
     const challengesWithProgress = await Promise.all(
@@ -561,7 +558,7 @@ router.get('/challenges', authenticate, async (req, res) => {
 
           case 'checkin_count':
             progress = await CheckinResponse.countDocuments({
-              firebase_uid,
+              user_id,
               created_at: { $gte: weekStart }
             });
             break;
