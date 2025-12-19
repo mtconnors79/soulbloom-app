@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -27,6 +28,8 @@ import {
   generateReminderId,
 } from '../../services/notificationService';
 
+const RESOURCE_SUGGESTIONS_KEY = '@soulbloom_resource_suggestions';
+
 const SettingsScreen = ({ navigation }) => {
   // Daily Reminder State
   const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
@@ -38,6 +41,9 @@ const SettingsScreen = ({ navigation }) => {
   const [reminders, setReminders] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingReminder, setEditingReminder] = useState(null);
+
+  // Preferences State
+  const [resourceSuggestionsEnabled, setResourceSuggestionsEnabled] = useState(true);
 
   // Load settings on mount
   useEffect(() => {
@@ -61,6 +67,25 @@ const SettingsScreen = ({ navigation }) => {
     // Load custom reminders
     const savedReminders = await loadReminders();
     setReminders(savedReminders);
+
+    // Load resource suggestions preference
+    try {
+      const resourcePref = await AsyncStorage.getItem(RESOURCE_SUGGESTIONS_KEY);
+      if (resourcePref !== null) {
+        setResourceSuggestionsEnabled(resourcePref === 'true');
+      }
+    } catch (error) {
+      console.log('Error loading resource preference:', error);
+    }
+  };
+
+  const handleResourceSuggestionsToggle = async (value) => {
+    setResourceSuggestionsEnabled(value);
+    try {
+      await AsyncStorage.setItem(RESOURCE_SUGGESTIONS_KEY, value.toString());
+    } catch (error) {
+      console.log('Error saving resource preference:', error);
+    }
   };
 
   const handleDailyReminderToggle = async (value) => {
@@ -364,6 +389,32 @@ const SettingsScreen = ({ navigation }) => {
                 ))}
               </View>
             )}
+          </View>
+        </View>
+
+        {/* Preferences Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          <View style={styles.settingCard}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <View style={[styles.settingIconContainer, { backgroundColor: '#FDF2F8' }]}>
+                  <Icon name="heart-outline" size={22} color="#EC4899" />
+                </View>
+                <View style={styles.settingText}>
+                  <Text style={styles.settingLabel}>Resource Suggestions</Text>
+                  <Text style={styles.settingDescription}>
+                    Show helpful resources based on check-in content
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={resourceSuggestionsEnabled}
+                onValueChange={handleResourceSuggestionsToggle}
+                trackColor={{ false: '#E5E7EB', true: '#FBCFE8' }}
+                thumbColor={resourceSuggestionsEnabled ? '#EC4899' : '#9CA3AF'}
+              />
+            </View>
           </View>
         </View>
 

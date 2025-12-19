@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,16 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
+  Linking,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Slider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { checkinAPI, progressAPI } from '../../services/api';
 import CrisisResourcesModal from '../../components/CrisisResourcesModal';
+
+const RESOURCE_SUGGESTIONS_KEY = '@soulbloom_resource_suggestions';
 
 const PROMPTS = [
   "How are you feeling right now?",
@@ -56,6 +61,37 @@ const CheckInScreen = ({ navigation }) => {
   const [crisisModalRequireAck, setCrisisModalRequireAck] = useState(false);
   const [crisisAlertMessage, setCrisisAlertMessage] = useState(null);
   const [showSupportLink, setShowSupportLink] = useState(false);
+
+  // Resource suggestion modal state
+  const [showResourceModal, setShowResourceModal] = useState(false);
+  const [detectedTopic, setDetectedTopic] = useState(null);
+  const [dontShowResourceSuggestions, setDontShowResourceSuggestions] = useState(false);
+  const [resourceSuggestionsEnabled, setResourceSuggestionsEnabled] = useState(true);
+
+  // Load preference on mount
+  useEffect(() => {
+    loadResourcePreference();
+  }, []);
+
+  const loadResourcePreference = async () => {
+    try {
+      const value = await AsyncStorage.getItem(RESOURCE_SUGGESTIONS_KEY);
+      if (value !== null) {
+        setResourceSuggestionsEnabled(value === 'true');
+      }
+    } catch (error) {
+      console.log('Error loading resource preference:', error);
+    }
+  };
+
+  const saveResourcePreference = async (enabled) => {
+    try {
+      await AsyncStorage.setItem(RESOURCE_SUGGESTIONS_KEY, enabled.toString());
+      setResourceSuggestionsEnabled(enabled);
+    } catch (error) {
+      console.log('Error saving resource preference:', error);
+    }
+  };
 
   const toggleEmotion = (emotion) => {
     setSelectedEmotions((prev) =>
@@ -106,6 +142,7 @@ const CheckInScreen = ({ navigation }) => {
 
       const riskLevel = checkinAnalysis?.risk_level?.toLowerCase();
       const sentiment = checkinAnalysis?.sentiment?.toLowerCase();
+      const detectedTopics = checkinAnalysis?.detected_topics;
 
       // Check for critical or high risk - show modal with required acknowledgment
       if (riskLevel === 'critical' || riskLevel === 'high') {
@@ -114,6 +151,10 @@ const CheckInScreen = ({ navigation }) => {
         );
         setCrisisModalRequireAck(true);
         setShowCrisisModal(true);
+      } else if (detectedTopics && detectedTopics.length > 0 && resourceSuggestionsEnabled) {
+        // Show contextual resource suggestion for detected topics
+        setDetectedTopic(detectedTopics[0]); // Show first detected topic
+        setShowResourceModal(true);
       } else if (sentiment === 'negative' || moodRating === 'terrible' || moodRating === 'not_good') {
         // Show subtle support link for negative sentiment
         setShowSupportLink(true);
@@ -155,6 +196,51 @@ const CheckInScreen = ({ navigation }) => {
     setShowSupportLink(false);
     setCrisisAlertMessage(null);
     setCrisisModalRequireAck(false);
+    setDetectedTopic(null);
+    setDontShowResourceSuggestions(false);
+  };
+
+  const handleResourceModalClose = () => {
+    if (dontShowResourceSuggestions) {
+      saveResourcePreference(false);
+    }
+    setShowResourceModal(false);
+    setDetectedTopic(null);
+    setDontShowResourceSuggestions(false);
+  };
+
+  const handleCallResource = (phone) => {
+    if (phone) {
+      const phoneUrl = `tel:${phone.replace(/[^0-9+]/g, '')}`;
+      Linking.openURL(phoneUrl).catch(err => {
+        console.log('Error opening phone:', err);
+        Alert.alert('Error', 'Unable to open phone dialer');
+      });
+    }
+  };
+
+  const handleOpenResourceUrl = (url) => {
+    if (url) {
+      Linking.openURL(url).catch(err => {
+        console.log('Error opening URL:', err);
+        Alert.alert('Error', 'Unable to open link');
+      });
+    }
+  };
+
+  const handleTextResource = (textOption) => {
+    if (textOption) {
+      // Parse "Text HOME to 741741" format
+      const match = textOption.match(/text\s+(\w+)\s+to\s+([\d-]+)/i);
+      if (match) {
+        const body = match[1];
+        const number = match[2];
+        Linking.openURL(`sms:${number}&body=${body}`).catch(err => {
+          console.log('Error opening SMS:', err);
+          Alert.alert('Error', 'Unable to open messaging app');
+        });
+      }
+    }
   };
 
   const handleOpenSupport = () => {
@@ -452,6 +538,110 @@ const CheckInScreen = ({ navigation }) => {
         requireAcknowledgment={crisisModalRequireAck}
         alertMessage={crisisAlertMessage}
       />
+
+      {/* Contextual Resource Suggestion Modal */}
+      <Modal
+        visible={showResourceModal}
+        transparent
+        animationType="slide"
+        onRequestClose={handleResourceModalClose}
+      >
+        <View style={styles.resourceModalOverlay}>
+          <View style={styles.resourceModalContent}>
+            {/* Header with gentle icon */}
+            <View style={styles.resourceModalHeader}>
+              <View style={styles.resourceModalIconContainer}>
+                <Icon name="heart" size={28} color="#EC4899" />
+              </View>
+              <Text style={styles.resourceModalTitle}>We're here for you</Text>
+            </View>
+
+            {/* Gentle message */}
+            <Text style={styles.resourceModalMessage}>
+              It sounds like you might be going through something related to{' '}
+              <Text style={styles.resourceModalTopic}>
+                {detectedTopic?.topic_name}
+              </Text>
+              . You're not alone, and support is available.
+            </Text>
+
+            {/* Resource card */}
+            {detectedTopic?.resource && (
+              <View style={styles.resourceCard}>
+                <Text style={styles.resourceName}>
+                  {detectedTopic.resource.name}
+                </Text>
+                <Text style={styles.resourceDescription}>
+                  {detectedTopic.resource.description}
+                </Text>
+
+                {/* Action buttons */}
+                <View style={styles.resourceActions}>
+                  {detectedTopic.resource.phone && (
+                    <TouchableOpacity
+                      style={styles.resourceActionButton}
+                      onPress={() => handleCallResource(detectedTopic.resource.phone)}
+                    >
+                      <Icon name="call" size={18} color="#fff" />
+                      <Text style={styles.resourceActionText}>
+                        {detectedTopic.resource.phone}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {detectedTopic.resource.text_option && (
+                    <TouchableOpacity
+                      style={[styles.resourceActionButton, styles.resourceActionSecondary]}
+                      onPress={() => handleTextResource(detectedTopic.resource.text_option)}
+                    >
+                      <Icon name="chatbubble" size={18} color="#6366F1" />
+                      <Text style={[styles.resourceActionText, styles.resourceActionTextSecondary]}>
+                        {detectedTopic.resource.text_option}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {detectedTopic.resource.url && (
+                    <TouchableOpacity
+                      style={styles.resourceLinkButton}
+                      onPress={() => handleOpenResourceUrl(detectedTopic.resource.url)}
+                    >
+                      <Icon name="globe-outline" size={16} color="#6366F1" />
+                      <Text style={styles.resourceLinkText}>Visit website</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* Don't show again checkbox */}
+            <TouchableOpacity
+              style={styles.dontShowContainer}
+              onPress={() => setDontShowResourceSuggestions(!dontShowResourceSuggestions)}
+            >
+              <View style={[
+                styles.checkbox,
+                dontShowResourceSuggestions && styles.checkboxChecked
+              ]}>
+                {dontShowResourceSuggestions && (
+                  <Icon name="checkmark" size={14} color="#fff" />
+                )}
+              </View>
+              <Text style={styles.dontShowText}>
+                Don't show these suggestions
+              </Text>
+            </TouchableOpacity>
+
+            {/* Dismiss button */}
+            <TouchableOpacity
+              style={styles.resourceDismissButton}
+              onPress={handleResourceModalClose}
+            >
+              <Text style={styles.resourceDismissText}>Not now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -766,6 +956,135 @@ const styles = StyleSheet.create({
     color: '#6366F1',
     fontWeight: '500',
     marginLeft: 8,
+  },
+  // Resource Suggestion Modal Styles
+  resourceModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  resourceModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  resourceModalHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  resourceModalIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FDF2F8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  resourceModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  resourceModalMessage: {
+    fontSize: 15,
+    color: '#4B5563',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  resourceModalTopic: {
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+  resourceCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+  },
+  resourceName: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 6,
+  },
+  resourceDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  resourceActions: {
+    gap: 10,
+  },
+  resourceActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6366F1',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  resourceActionSecondary: {
+    backgroundColor: '#EEF2FF',
+  },
+  resourceActionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  resourceActionTextSecondary: {
+    color: '#6366F1',
+  },
+  resourceLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 6,
+  },
+  resourceLinkText: {
+    fontSize: 14,
+    color: '#6366F1',
+    fontWeight: '500',
+  },
+  dontShowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  checkboxChecked: {
+    backgroundColor: '#6366F1',
+    borderColor: '#6366F1',
+  },
+  dontShowText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  resourceDismissButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  resourceDismissText: {
+    fontSize: 15,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
 });
 

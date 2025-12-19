@@ -1,4 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const { detectTopics } = require('../data/topicResources');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -143,6 +144,12 @@ const analyzeCheckIn = async (text, structuredData = {}) => {
     // Validate and sanitize the response
     analysis = validateAndSanitizeAnalysis(analysis);
 
+    // Detect topics from check-in text and add resources
+    const detectedTopics = detectTopics(text);
+    if (detectedTopics.length > 0) {
+      analysis.detected_topics = detectedTopics;
+    }
+
     // Add crisis resources if critical
     if (analysis.risk_level === 'critical') {
       analysis.suggestions = [...CRISIS_RESOURCES, ...analysis.suggestions];
@@ -283,7 +290,10 @@ const getFallbackAnalysis = (text, structuredData = {}) => {
   // Generate contextual suggestions
   const suggestions = getSuggestionsForContext(sentiment, stress_level, selected_emotions);
 
-  return {
+  // Detect topics from text
+  const detectedTopics = detectTopics(text);
+
+  const result = {
     sentiment,
     sentiment_score: Math.round(sentiment_score * 100) / 100,
     emotions: selected_emotions.length > 0 ? selected_emotions : [],
@@ -295,6 +305,13 @@ const getFallbackAnalysis = (text, structuredData = {}) => {
     supportive_message: getSupportiveMessageForContext(mood_rating, stress_level, selected_emotions),
     is_fallback: true
   };
+
+  // Add detected topics if any
+  if (detectedTopics.length > 0) {
+    result.detected_topics = detectedTopics;
+  }
+
+  return result;
 };
 
 const getSuggestionsForSentiment = (sentiment) => {
