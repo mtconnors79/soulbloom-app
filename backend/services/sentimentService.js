@@ -5,6 +5,79 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
+// ==========================
+// CRISIS KEYWORD DEFINITIONS
+// ==========================
+
+// CRITICAL: Direct suicidal language - requires immediate attention, modal NOT dismissible
+const CRITICAL_KEYWORDS = [
+  // Active suicidal ideation
+  'suicide', 'suicidal',
+  'kill myself', 'killing myself', 'going to kill myself',
+  'end my life', 'ending my life',
+  'want to die', 'wanna die', 'i want to die',
+  'ending it all', 'end it all',
+  'take my own life', 'taking my own life',
+  // Passive suicidal ideation (serious enough for critical)
+  'don\'t want to be here', 'dont want to be here', 'don\'t want to be here anymore',
+  'better off without me', 'better off dead',
+  'no reason to live', 'no point in living',
+  'can\'t go on', 'cant go on', 'cannot go on',
+  'not worth living', 'life isn\'t worth', 'life isnt worth',
+  'wish i wasn\'t here', 'wish i wasnt here', 'wish i was dead',
+  'disappear forever', 'just disappear',
+  'no point anymore', 'what\'s the point', 'whats the point of living'
+];
+
+// HIGH: Self-harm behaviors - serious but modal IS dismissible, shows crisis resources prominently
+const HIGH_RISK_KEYWORDS = [
+  // Self-harm behaviors
+  'cutting', 'cut myself', 'cutting myself', 'cuts on my',
+  'burning myself', 'burn myself', 'burned myself', 'burns on my',
+  'scratching myself', 'scratch myself', 'scratched myself',
+  'hitting myself', 'hit myself', 'punching myself', 'punching walls',
+  'hurting myself', 'hurt myself', 'harming myself', 'harm myself',
+  'self-harm', 'self harm', 'self-injury', 'self injury',
+  // Less urgent passive ideation
+  'don\'t want to wake up', 'dont want to wake up',
+  'go to sleep and not wake up', 'sleep forever',
+  'everyone would be better', 'world would be better without',
+  'tired of living', 'tired of life', 'exhausted from living',
+  'give up', 'given up on life', 'giving up',
+  'can\'t take it anymore', 'cant take it anymore', 'can\'t take this anymore'
+];
+
+/**
+ * Check text for crisis keywords and return risk level with matched phrase
+ * @param {string} text - The text to check
+ * @returns {Object} { riskLevel: string, matchedPhrase: string|null }
+ */
+const checkCrisisKeywords = (text) => {
+  if (!text || typeof text !== 'string') {
+    return { riskLevel: null, matchedPhrase: null };
+  }
+
+  const lowerText = text.toLowerCase();
+
+  // Check CRITICAL keywords first
+  for (const keyword of CRITICAL_KEYWORDS) {
+    if (lowerText.includes(keyword)) {
+      console.log(`[CRISIS DETECTION] Risk escalated to CRITICAL due to: "${keyword}"`);
+      return { riskLevel: 'critical', matchedPhrase: keyword };
+    }
+  }
+
+  // Check HIGH risk keywords
+  for (const keyword of HIGH_RISK_KEYWORDS) {
+    if (lowerText.includes(keyword)) {
+      console.log(`[CRISIS DETECTION] Risk escalated to HIGH due to: "${keyword}"`);
+      return { riskLevel: 'high', matchedPhrase: keyword };
+    }
+  }
+
+  return { riskLevel: null, matchedPhrase: null };
+};
+
 const ANALYSIS_PROMPT = `You are a mental health analysis assistant for a wellness app called MindWell. Analyze the following check-in from a user and provide a structured assessment.
 
 Your analysis must be compassionate, non-judgmental, and focused on supporting the user's mental wellbeing.
@@ -27,13 +100,25 @@ Analyze the check-in and return a JSON object with the following structure:
 Risk Level Guidelines:
 - "low": Normal daily emotions, no concerning content
 - "moderate": Signs of stress, anxiety, or mild depression that could benefit from attention (stress level 6-7, negative mood)
-- "high": Significant distress, self-harm behaviors (cutting, burning), isolation, hopelessness, but no immediate suicidal intent (stress level 8-10, terrible mood, mentions of self-harm without suicidal ideation)
-- "critical": Any mention of suicide, wanting to die, ending one's life, or harming others - requires immediate attention
+- "high": Self-harm behaviors or passive ideation without immediate suicidal intent
+- "critical": Direct suicidal language or active plans - requires immediate attention
 
-IMPORTANT for risk detection:
-- Self-harm behaviors (cutting, burning, scratching, hitting self) should be at least "high" risk
-- Passive suicidal ideation phrases like "don't want to be here anymore", "better off without me", "no reason to live", "can't go on", "ending it all", "not worth living" should be "critical"
-- Active suicidal ideation (suicide, kill myself, end my life, want to die) is always "critical"
+CRITICAL RISK (requires_immediate_attention = true):
+Return "critical" for any of these:
+- Direct suicidal statements: "suicide", "kill myself", "end my life", "want to die", "take my own life"
+- Passive suicidal ideation: "don't want to be here", "better off without me", "no reason to live", "can't go on", "not worth living", "wish I wasn't here", "disappear forever", "no point anymore"
+- Any mention of a suicide plan or method
+
+HIGH RISK (show crisis resources, but dismissible):
+Return "high" for any of these:
+- Self-harm behaviors: "cutting", "cut myself", "burning myself", "scratching myself", "hurting myself", "self-harm"
+- Passive distress: "tired of living", "can't take it anymore", "want to sleep forever", "give up on life"
+- High stress (8-10) combined with terrible mood and hopeless language
+
+IMPORTANT:
+- When in doubt, escalate to the higher risk level
+- Include the specific concerning phrase in risk_indicators array
+- Passive suicidal ideation ("better off without me", "no reason to live") should be CRITICAL, not just high
 
 Consider the structured inputs:
 - Mood Rating: great (very positive), good (positive), okay (neutral), not_good (negative), terrible (very negative)
@@ -149,6 +234,18 @@ const analyzeCheckIn = async (text, structuredData = {}) => {
     // Validate and sanitize the response
     analysis = validateAndSanitizeAnalysis(analysis);
 
+    // SAFETY CHECK: Run keyword detection as a safety net in case AI missed something
+    const crisisCheck = checkCrisisKeywords(text);
+    if (crisisCheck.riskLevel === 'critical' && analysis.risk_level !== 'critical') {
+      console.log(`[CRISIS DETECTION] AI returned "${analysis.risk_level}" but keyword check found CRITICAL: "${crisisCheck.matchedPhrase}" - escalating`);
+      analysis.risk_level = 'critical';
+      analysis.risk_indicators = [...(analysis.risk_indicators || []), `Critical keyword detected: "${crisisCheck.matchedPhrase}"`];
+    } else if (crisisCheck.riskLevel === 'high' && (analysis.risk_level === 'low' || analysis.risk_level === 'moderate')) {
+      console.log(`[CRISIS DETECTION] AI returned "${analysis.risk_level}" but keyword check found HIGH: "${crisisCheck.matchedPhrase}" - escalating`);
+      analysis.risk_level = 'high';
+      analysis.risk_indicators = [...(analysis.risk_indicators || []), `High-risk keyword detected: "${crisisCheck.matchedPhrase}"`];
+    }
+
     // Detect topics from check-in text and add resources
     const detectedTopics = detectTopics(text);
     if (detectedTopics.length > 0) {
@@ -157,6 +254,7 @@ const analyzeCheckIn = async (text, structuredData = {}) => {
       // Elevate risk level if self_harm topic detected and risk is below high
       const hasSelfHarmTopic = detectedTopics.some(t => t.topic_id === 'self_harm');
       if (hasSelfHarmTopic && (analysis.risk_level === 'low' || analysis.risk_level === 'moderate')) {
+        console.log(`[CRISIS DETECTION] Risk escalated to HIGH due to: self_harm topic detected`);
         analysis.risk_level = 'high';
         analysis.risk_indicators = [...(analysis.risk_indicators || []), 'Self-harm topic detected'];
         analysis.show_crisis_resources = true;
@@ -215,28 +313,11 @@ const validateAndSanitizeAnalysis = (analysis) => {
 
 const getFallbackAnalysis = (text, structuredData = {}) => {
   const { mood_rating, stress_level, selected_emotions = [] } = structuredData;
-  const lowerText = (text || '').toLowerCase();
 
-  // Critical crisis keywords - active suicidal ideation
-  const criticalKeywords = [
-    'suicide', 'kill myself', 'end my life', 'want to die', 'self-harm', 'hurt myself',
-    'don\'t want to be here', 'dont want to be here', 'better off without me',
-    'no reason to live', 'can\'t go on', 'cant go on', 'ending it all',
-    'not worth living', 'take my own life', 'end it all', 'kill me'
-  ];
-  const hasCriticalIndicators = criticalKeywords.some(keyword => lowerText.includes(keyword));
+  // Use the centralized crisis keyword detection with logging
+  const crisisCheck = checkCrisisKeywords(text);
 
-  // High risk keywords - self-harm behaviors without suicidal intent
-  const highRiskKeywords = [
-    'cutting', 'cut myself', 'cutting myself',
-    'burning myself', 'burn myself', 'burned myself',
-    'scratching myself', 'scratch myself',
-    'hitting myself', 'hit myself', 'punching walls',
-    'hurting myself', 'harming myself', 'self-injury'
-  ];
-  const hasHighRiskIndicators = highRiskKeywords.some(keyword => lowerText.includes(keyword));
-
-  if (hasCriticalIndicators) {
+  if (crisisCheck.riskLevel === 'critical') {
     return {
       sentiment: 'negative',
       sentiment_score: -0.9,
@@ -245,14 +326,14 @@ const getFallbackAnalysis = (text, structuredData = {}) => {
       themes: ['crisis'],
       suggestions: CRISIS_RESOURCES,
       risk_level: 'critical',
-      risk_indicators: ['Crisis-related content detected'],
+      risk_indicators: [`Crisis-related content detected: "${crisisCheck.matchedPhrase}"`],
       supportive_message: 'I\'m concerned about what you\'ve shared. Please reach out to a crisis helpline or trusted person immediately. You matter and help is available.',
       requires_immediate_attention: true,
       is_fallback: true
     };
   }
 
-  if (hasHighRiskIndicators) {
+  if (crisisCheck.riskLevel === 'high') {
     return {
       sentiment: 'negative',
       sentiment_score: -0.7,
@@ -265,7 +346,7 @@ const getFallbackAnalysis = (text, structuredData = {}) => {
         ...CRISIS_RESOURCES.slice(2) // Add the last two resources
       ],
       risk_level: 'high',
-      risk_indicators: ['Self-harm related content detected'],
+      risk_indicators: [`Self-harm related content detected: "${crisisCheck.matchedPhrase}"`],
       supportive_message: 'I can see you\'re going through something really difficult. Your pain is valid, and there are people who want to help. Please consider reaching out to someone you trust or a crisis helpline.',
       show_crisis_resources: true, // Flag to show crisis resources in UI
       is_fallback: true
@@ -349,6 +430,7 @@ const getFallbackAnalysis = (text, structuredData = {}) => {
   // Check if self_harm topic detected - elevate risk if needed
   const hasSelfHarmTopic = detectedTopics.some(t => t.topic_id === 'self_harm');
   if (hasSelfHarmTopic && (risk_level === 'low' || risk_level === 'moderate')) {
+    console.log(`[CRISIS DETECTION] Risk escalated to HIGH due to: self_harm topic detected (fallback analysis)`);
     risk_level = 'high';
   }
 
