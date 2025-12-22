@@ -75,6 +75,7 @@ const MoodScreen = () => {
   const [showAllEntries, setShowAllEntries] = useState(false);
   const [showVarianceTooltip, setShowVarianceTooltip] = useState(false);
   const [selectedVarianceDay, setSelectedVarianceDay] = useState(null);
+  const [showDetailedInfoTooltip, setShowDetailedInfoTooltip] = useState(false);
 
   // Data states
   const [moodStats, setMoodStats] = useState(null);
@@ -595,7 +596,13 @@ const MoodScreen = () => {
               <Icon name="trending-up" size={20} color="#6366F1" />
               <Text style={styles.chartTitle}>Combined Mood Trend</Text>
             </View>
-            <View style={styles.viewToggle}>
+            <View style={styles.viewToggleWithInfo}>
+              <TouchableOpacity
+                style={styles.infoIconButton}
+                onPress={() => setShowDetailedInfoTooltip(true)}
+              >
+                <Icon name="information-circle-outline" size={18} color="#9CA3AF" />
+              </TouchableOpacity>
               <Text style={styles.viewToggleLabel}>Detailed</Text>
               <Switch
                 value={detailedMoodView}
@@ -1053,6 +1060,76 @@ const MoodScreen = () => {
           setSelectedVarianceDay(null);
         }}
       />
+
+      {/* Detailed View Info Tooltip */}
+      <Modal
+        visible={showDetailedInfoTooltip}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDetailedInfoTooltip(false)}
+      >
+        <TouchableOpacity
+          style={styles.infoTooltipOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDetailedInfoTooltip(false)}
+        >
+          <View style={styles.infoTooltipContainer} onStartShouldSetResponder={() => true}>
+            <View style={styles.infoTooltipHeader}>
+              <Icon name="analytics-outline" size={24} color="#6366F1" />
+              <Text style={styles.infoTooltipTitle}>Detailed View</Text>
+            </View>
+
+            <View style={styles.infoTooltipSection}>
+              <View style={styles.infoTooltipIconRow}>
+                <View style={[styles.infoTooltipIcon, { backgroundColor: '#EEF2FF' }]}>
+                  <View style={styles.rangeBandPreview} />
+                </View>
+                <View style={styles.infoTooltipTextContent}>
+                  <Text style={styles.infoTooltipSectionTitle}>Range Bands</Text>
+                  <Text style={styles.infoTooltipSectionText}>
+                    The shaded area shows your daily mood range from lowest to highest. A wider band means more mood variation that day.
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.infoTooltipSection}>
+              <View style={styles.infoTooltipIconRow}>
+                <View style={[styles.infoTooltipIcon, { backgroundColor: '#FEF3C7' }]}>
+                  <Icon name="warning" size={16} color="#F59E0B" />
+                </View>
+                <View style={styles.infoTooltipTextContent}>
+                  <Text style={styles.infoTooltipSectionTitle}>Variance Flags</Text>
+                  <Text style={styles.infoTooltipSectionText}>
+                    Yellow warning icons appear on days with significant mood swings (2+ levels). Tap them to see details.
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.infoTooltipSection}>
+              <View style={styles.infoTooltipIconRow}>
+                <View style={[styles.infoTooltipIcon, { backgroundColor: '#F3E8FF' }]}>
+                  <Icon name="list-outline" size={16} color="#8B5CF6" />
+                </View>
+                <View style={styles.infoTooltipTextContent}>
+                  <Text style={styles.infoTooltipSectionTitle}>All Entries</Text>
+                  <Text style={styles.infoTooltipSectionText}>
+                    Toggle "All Entries" to see individual check-ins instead of daily summaries.
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.infoTooltipClose}
+              onPress={() => setShowDetailedInfoTooltip(false)}
+            >
+              <Text style={styles.infoTooltipCloseText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -1480,6 +1557,92 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   dayDetailsCloseText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  // Info tooltip styles
+  viewToggleWithInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoIconButton: {
+    padding: 4,
+    marginRight: 2,
+  },
+  infoTooltipOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  infoTooltipContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  infoTooltipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  infoTooltipTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginLeft: 10,
+  },
+  infoTooltipSection: {
+    marginBottom: 16,
+  },
+  infoTooltipIconRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  infoTooltipIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  rangeBandPreview: {
+    width: 20,
+    height: 14,
+    backgroundColor: 'rgba(99, 102, 241, 0.3)',
+    borderRadius: 3,
+  },
+  infoTooltipTextContent: {
+    flex: 1,
+  },
+  infoTooltipSectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  infoTooltipSectionText: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+  infoTooltipClose: {
+    backgroundColor: '#6366F1',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  infoTooltipCloseText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',

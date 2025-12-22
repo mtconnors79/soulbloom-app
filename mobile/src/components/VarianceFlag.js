@@ -1,7 +1,48 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+
+/**
+ * PulsingFlag - Animated flag with gentle pulse effect
+ */
+const PulsingFlag = ({ onPress }) => {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.15,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+      <Animated.View
+        style={[
+          styles.flagIcon,
+          { transform: [{ scale: pulseAnim }] },
+        ]}
+      >
+        <Icon name="warning" size={14} color="#F59E0B" />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 /**
  * VarianceFlag - Warning indicator for days with significant mood swings (2+ levels)
@@ -66,7 +107,7 @@ const VarianceFlag = ({
         const y = getY(day.max) - flagSize - 4; // Position above the max point
 
         return (
-          <TouchableOpacity
+          <View
             key={day.date}
             style={[
               styles.flagContainer,
@@ -75,13 +116,9 @@ const VarianceFlag = ({
                 top: y,
               },
             ]}
-            onPress={() => onFlagPress && onFlagPress(day)}
-            activeOpacity={0.7}
           >
-            <View style={styles.flagIcon}>
-              <Icon name="warning" size={14} color="#F59E0B" />
-            </View>
-          </TouchableOpacity>
+            <PulsingFlag onPress={() => onFlagPress && onFlagPress(day)} />
+          </View>
         );
       })}
     </View>
@@ -146,6 +183,15 @@ export const VarianceTooltip = ({ day, visible, onClose }) => {
           <Text style={styles.tooltipHint}>
             Large mood swings can indicate stress or emotional dysregulation. Consider journaling or reaching out for support.
           </Text>
+
+          {/* Care Provider Suggestion */}
+          <View style={styles.careProviderBox}>
+            <Icon name="medical-outline" size={18} color="#6366F1" />
+            <Text style={styles.careProviderText}>
+              Consider sharing this pattern with your care provider or therapist.
+            </Text>
+          </View>
+
           <TouchableOpacity style={styles.tooltipClose} onPress={onClose}>
             <Text style={styles.tooltipCloseText}>Got it</Text>
           </TouchableOpacity>
@@ -267,7 +313,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
     lineHeight: 18,
+    marginBottom: 12,
+  },
+  careProviderBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 10,
+    padding: 12,
     marginBottom: 16,
+    gap: 10,
+  },
+  careProviderText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#4F46E5',
+    lineHeight: 18,
+    fontWeight: '500',
   },
   tooltipClose: {
     backgroundColor: '#6366F1',
