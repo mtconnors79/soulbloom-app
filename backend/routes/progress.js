@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateAndLoadUser: authenticate } = require('../middleware/auth');
-const { UserAchievement, ActivityCompletion, MoodEntry, CheckinResponse } = require('../models');
+const { UserAchievement, ActivityCompletion, MoodEntry, CheckinResponse, UserGoal } = require('../models');
 const { Op } = require('sequelize');
 
 // Badge definitions
@@ -68,6 +68,20 @@ const BADGES = {
     description: 'Write 500+ words in check-in notes',
     icon: 'pencil',
     category: 'tracking'
+  },
+  goal_setter: {
+    id: 'goal_setter',
+    name: 'Goal Setter',
+    description: 'Created your first personal goal',
+    icon: 'target',
+    category: 'goals'
+  },
+  goal_achiever: {
+    id: 'goal_achiever',
+    name: 'Goal Achiever',
+    description: 'Completed your first personal goal',
+    icon: 'ribbon',
+    category: 'goals'
   }
 };
 
@@ -462,6 +476,27 @@ router.post('/achievements/check', authenticate, async (req, res) => {
       });
       if (totalWords >= 500) {
         newlyUnlocked.push('words_500');
+      }
+    }
+
+    // goal_setter: Created your first personal goal
+    if (!unlockedBadges.has('goal_setter')) {
+      const goalCount = await UserGoal.count({ where: { user_id } });
+      if (goalCount >= 1) {
+        newlyUnlocked.push('goal_setter');
+      }
+    }
+
+    // goal_achiever: Completed your first personal goal
+    if (!unlockedBadges.has('goal_achiever')) {
+      const completedGoalCount = await UserGoal.count({
+        where: {
+          user_id,
+          completed_at: { [Op.ne]: null }
+        }
+      });
+      if (completedGoalCount >= 1) {
+        newlyUnlocked.push('goal_achiever');
       }
     }
 

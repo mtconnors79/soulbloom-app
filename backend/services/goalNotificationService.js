@@ -2,6 +2,7 @@ const { UserGoal, User } = require('../models');
 const { Op } = require('sequelize');
 const { calculateProgress, isGoalCompleted, getDateRange } = require('./goalProgressService');
 const { sendToUser } = require('./notificationService');
+const { checkGoalAchieverBadge } = require('./badgeService');
 
 /**
  * Check if a goal was just achieved after an activity completion
@@ -40,6 +41,11 @@ const checkGoalAchieved = async (userId, activityType) => {
 
         // Send notification
         await sendGoalAchievedNotification(user, goal);
+
+        // Check for Goal Achiever badge (first goal completed)
+        checkGoalAchieverBadge(userId).catch(err =>
+          console.error('[GoalNotification] Goal Achiever badge check failed:', err.message)
+        );
 
         console.log(`[GoalNotification] Goal achieved: ${goal.title} for user ${userId}`);
       }

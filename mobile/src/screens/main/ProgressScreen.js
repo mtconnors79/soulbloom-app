@@ -30,6 +30,8 @@ const BADGE_ICONS = {
   wind: 'cloudy',
   'chart-line': 'trending-up',
   pencil: 'pencil',
+  target: 'flag-outline',
+  ribbon: 'ribbon-outline',
 };
 
 const ProgressScreen = () => {

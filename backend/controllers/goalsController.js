@@ -2,6 +2,7 @@ const { UserGoal } = require('../models');
 const { Op } = require('sequelize');
 const { calculateProgressForGoals, calculateProgress, isGoalCompleted, getTimeRemaining } = require('../services/goalProgressService');
 const { getAllTemplates, getTemplateById, getTemplatesByCategory, getTemplatesByActivityType } = require('../data/goalTemplates');
+const { checkGoalSetterBadge } = require('../services/badgeService');
 
 const MAX_ACTIVE_GOALS = 10;
 
@@ -171,6 +172,11 @@ const createGoal = async (req, res) => {
       time_frame,
       is_active: true
     });
+
+    // Check for Goal Setter badge (first goal created)
+    checkGoalSetterBadge(userId).catch(err =>
+      console.error('Goal Setter badge check failed:', err.message)
+    );
 
     // Calculate initial progress
     const progress = await calculateProgress(goal);
