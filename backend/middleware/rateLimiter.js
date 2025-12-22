@@ -76,7 +76,7 @@ const createSmartRateLimitHandler = (defaultMessage) => async (req, res) => {
 const baseOptions = {
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  validate: { xForwardedForHeader: false, trustProxy: false, ip: false },
   keyGenerator: userKeyGenerator
 };
 
