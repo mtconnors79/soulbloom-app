@@ -3,6 +3,25 @@ import auth from '@react-native-firebase/auth';
 import { Platform } from 'react-native';
 import Config from 'react-native-config';
 
+// Rate limit state management
+let rateLimitHandler = null;
+
+/**
+ * Set a handler to be called when rate limit (429) is hit
+ * @param {Function} handler - Function to call with rate limit data
+ *   handler({ isDistressed, retryAfter, crisisResources, message })
+ */
+export const setRateLimitHandler = (handler) => {
+  rateLimitHandler = handler;
+};
+
+/**
+ * Clear the rate limit handler
+ */
+export const clearRateLimitHandler = () => {
+  rateLimitHandler = null;
+};
+
 // Base URL for the API
 // Uses environment variable, with platform-specific fallback for Android emulator
 const getBaseUrl = () => {
@@ -51,6 +70,29 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Handle 429 Rate Limit errors
+    if (error.response?.status === 429) {
+      const responseData = error.response.data || {};
+      const distressContext = responseData.distressContext || {};
+
+      // Call the rate limit handler if set
+      if (rateLimitHandler) {
+        rateLimitHandler({
+          isDistressed: distressContext.hasRecentDistress || false,
+          retryAfter: responseData.retryAfter || 60,
+          crisisResources: responseData.crisisResources || [],
+          message: responseData.message || "You're using the app a lot. Give us a moment to catch up.",
+        });
+      }
+
+      return Promise.reject({
+        status: 429,
+        message: responseData.message || 'Rate limit exceeded',
+        data: responseData,
+        isRateLimited: true,
+      });
+    }
 
     // Handle 401 errors (token expired)
     if (error.response?.status === 401 && !originalRequest._retry) {

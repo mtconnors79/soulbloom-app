@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/Ionicons';
 import auth from '@react-native-firebase/auth';
+
+// Components
+import RateLimitModal from '../components/RateLimitModal';
+
+// API rate limit handlers
+import { setRateLimitHandler, clearRateLimitHandler } from '../services/api';
 
 // Auth Screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -199,7 +205,53 @@ const AuthStack = () => {
 const AppNavigator = () => {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState(null);
+  const [rateLimitData, setRateLimitData] = useState(null);
 
+  // Handle rate limit modal close
+  const handleRateLimitClose = useCallback(() => {
+    try {
+      setRateLimitData(null);
+    } catch (error) {
+      console.error('[AppNavigator] Error closing rate limit modal:', error);
+    }
+  }, []);
+
+  // Set up rate limit handler
+  useEffect(() => {
+    try {
+      setRateLimitHandler((data) => {
+        // Defensive checks for data validity
+        if (!data || typeof data !== 'object') {
+          console.warn('[AppNavigator] Invalid rate limit data received');
+          return;
+        }
+
+        // Validate and sanitize the data
+        const sanitizedData = {
+          isDistressed: typeof data.isDistressed === 'boolean' ? data.isDistressed : false,
+          retryAfter: typeof data.retryAfter === 'number' && data.retryAfter > 0
+            ? data.retryAfter
+            : 60,
+          crisisResources: Array.isArray(data.crisisResources) ? data.crisisResources : [],
+          message: typeof data.message === 'string' ? data.message : '',
+        };
+
+        setRateLimitData(sanitizedData);
+      });
+    } catch (error) {
+      console.error('[AppNavigator] Error setting rate limit handler:', error);
+    }
+
+    return () => {
+      try {
+        clearRateLimitHandler();
+      } catch (error) {
+        console.error('[AppNavigator] Error clearing rate limit handler:', error);
+      }
+    };
+  }, []);
+
+  // Auth state listener
   useEffect(() => {
     const unsubscribe = auth().onAuthStateChanged((firebaseUser) => {
       setUser(firebaseUser);
@@ -216,9 +268,20 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
-      {user ? <MainStackNavigator /> : <AuthStack />}
-    </NavigationContainer>
+    <>
+      <NavigationContainer>
+        {user ? <MainStackNavigator /> : <AuthStack />}
+      </NavigationContainer>
+
+      {/* Rate Limit Modal - rendered outside NavigationContainer */}
+      <RateLimitModal
+        visible={rateLimitData !== null}
+        isDistressed={rateLimitData?.isDistressed || false}
+        retryAfter={rateLimitData?.retryAfter || 60}
+        crisisResources={rateLimitData?.crisisResources || []}
+        onClose={handleRateLimitClose}
+      />
+    </>
   );
 };
 
