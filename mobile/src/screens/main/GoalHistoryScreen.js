@@ -1,12 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -14,6 +14,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { goalsAPI } from '../../services/goalsApi';
 import { colors } from '../../theme/colors';
 
+// Activity type icons
 const ACTIVITY_ICONS = {
   check_in: 'create-outline',
   quick_mood: 'happy-outline',
@@ -22,24 +23,30 @@ const ACTIVITY_ICONS = {
   journaling: 'book-outline',
 };
 
-const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+// Activity type labels
+const ACTIVITY_LABELS = {
+  check_in: 'Check-in',
+  quick_mood: 'Quick Mood',
+  mindfulness: 'Mindfulness',
+  breathing: 'Breathing',
+  journaling: 'Journaling',
+};
+
+// Time frame labels
+const TIME_FRAME_LABELS = {
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
 };
 
 const GoalHistoryScreen = ({ navigation }) => {
-  const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [clearing, setClearing] = useState(false);
+  const [goals, setGoals] = useState([]);
 
   const fetchHistory = async () => {
     try {
-      const response = await goalsAPI.getHistory({ limit: 100 });
+      const response = await goalsAPI.getHistory();
       setGoals(response.data?.goals || []);
     } catch (error) {
       console.error('Error fetching goal history:', error.message);
@@ -62,23 +69,20 @@ const GoalHistoryScreen = ({ navigation }) => {
 
   const handleClearHistory = () => {
     Alert.alert(
-      'Clear History',
-      'Are you sure you want to delete all past goals? This action cannot be undone.',
+      'Clear Goal History',
+      'Are you sure you want to delete all past goals? This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Clear All',
           style: 'destructive',
           onPress: async () => {
-            setClearing(true);
             try {
               await goalsAPI.clearHistory();
               setGoals([]);
               Alert.alert('Success', 'Goal history cleared');
             } catch (error) {
               Alert.alert('Error', 'Failed to clear history');
-            } finally {
-              setClearing(false);
             }
           },
         },
@@ -86,62 +90,132 @@ const GoalHistoryScreen = ({ navigation }) => {
     );
   };
 
-  const getGoalStatus = (goal) => {
-    if (goal.completed_at) {
-      return { label: 'Completed', color: '#10B981', icon: 'checkmark-circle' };
-    }
-    return { label: 'Abandoned', color: colors.textSecondary, icon: 'close-circle' };
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   };
 
-  const renderGoalItem = ({ item: goal }) => {
-    const status = getGoalStatus(goal);
+  const getStatusInfo = (goal) => {
+    if (goal.completed_at) {
+      return {
+        label: 'Completed',
+        color: colors.success,
+        bgColor: '#ECFDF5',
+        icon: 'checkmark-circle',
+      };
+    }
+    return {
+      label: 'Expired',
+      color: colors.warning,
+      bgColor: '#FEF3C7',
+      icon: 'time-outline',
+    };
+  };
+
+  const renderGoalItem = ({ item }) => {
+    const statusInfo = getStatusInfo(item);
 
     return (
-      <View style={styles.goalItem}>
-        <View style={[styles.statusIndicator, { backgroundColor: status.color }]} />
-
-        <View style={styles.goalContent}>
-          <View style={styles.goalHeader}>
-            <View style={styles.goalIconContainer}>
-              <Icon
-                name={ACTIVITY_ICONS[goal.activity_type] || 'flag-outline'}
-                size={20}
-                color={colors.textSecondary}
-              />
-            </View>
-            <View style={styles.goalInfo}>
-              <Text style={styles.goalTitle} numberOfLines={1}>{goal.title}</Text>
-              <Text style={styles.goalMeta}>
-                {goal.target_count}x {goal.time_frame}
-              </Text>
-            </View>
+      <View style={styles.goalCard}>
+        <View style={styles.goalHeader}>
+          <View style={styles.goalIconContainer}>
+            <Icon
+              name={ACTIVITY_ICONS[item.activity_type] || 'flag-outline'}
+              size={24}
+              color={colors.primary}
+            />
           </View>
-
-          <View style={styles.goalFooter}>
-            <View style={styles.statusBadge}>
-              <Icon name={status.icon} size={14} color={status.color} />
-              <Text style={[styles.statusText, { color: status.color }]}>
-                {status.label}
-              </Text>
-            </View>
-            <Text style={styles.dateText}>
-              {formatDate(goal.completed_at || goal.updated_at)}
+          <View style={styles.goalInfo}>
+            <Text style={styles.goalTitle}>{item.title}</Text>
+            <Text style={styles.goalMeta}>
+              {ACTIVITY_LABELS[item.activity_type]} • {TIME_FRAME_LABELS[item.time_frame]}
             </Text>
           </View>
+          <View style={[styles.statusBadge, { backgroundColor: statusInfo.bgColor }]}>
+            <Icon name={statusInfo.icon} size={14} color={statusInfo.color} />
+            <Text style={[styles.statusText, { color: statusInfo.color }]}>
+              {statusInfo.label}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.goalDetails}>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Target:</Text>
+            <Text style={styles.detailValue}>
+              {item.target_count} {item.target_count === 1 ? 'time' : 'times'} per {item.time_frame.replace('ly', '')}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Created:</Text>
+            <Text style={styles.detailValue}>{formatDate(item.created_at)}</Text>
+          </View>
+          {item.completed_at ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Completed:</Text>
+              <Text style={styles.detailValue}>{formatDate(item.completed_at)}</Text>
+            </View>
+          ) : (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Ended:</Text>
+              <Text style={styles.detailValue}>{formatDate(item.updated_at)}</Text>
+            </View>
+          )}
         </View>
       </View>
     );
   };
 
-  const renderEmptyState = () => (
+  const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <Icon name="time-outline" size={64} color={colors.textSecondary} />
-      <Text style={styles.emptyTitle}>No past goals</Text>
+      <Text style={styles.emptyTitle}>No Past Goals</Text>
       <Text style={styles.emptyText}>
-        Completed and deleted goals will appear here
+        Completed and expired goals will appear here
       </Text>
     </View>
   );
+
+  const renderHeader = () => {
+    if (goals.length === 0) return null;
+
+    const completedCount = goals.filter(g => g.completed_at).length;
+    const expiredCount = goals.length - completedCount;
+
+    return (
+      <View style={styles.summaryContainer}>
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryCount}>{completedCount}</Text>
+          <Text style={styles.summaryLabel}>Completed</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryCount}>{expiredCount}</Text>
+          <Text style={styles.summaryLabel}>Expired</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryCount}>{goals.length}</Text>
+          <Text style={styles.summaryLabel}>Total</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderFooter = () => {
+    if (goals.length === 0) return null;
+
+    return (
+      <TouchableOpacity style={styles.clearButton} onPress={handleClearHistory}>
+        <Icon name="trash-outline" size={20} color="#EF4444" />
+        <Text style={styles.clearButtonText}>Clear History</Text>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -158,32 +232,14 @@ const GoalHistoryScreen = ({ navigation }) => {
         data={goals}
         keyExtractor={(item) => item.id}
         renderItem={renderGoalItem}
+        ListEmptyComponent={renderEmpty}
+        ListHeaderComponent={renderHeader}
+        ListFooterComponent={renderFooter}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        ListEmptyComponent={renderEmptyState}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
-
-      {goals.length > 0 && (
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={handleClearHistory}
-            disabled={clearing}
-          >
-            {clearing ? (
-              <ActivityIndicator size="small" color={colors.error} />
-            ) : (
-              <>
-                <Icon name="trash-outline" size={18} color={colors.error} />
-                <Text style={styles.clearButtonText}>Clear History</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 };
@@ -208,29 +264,54 @@ const styles = StyleSheet.create({
     padding: 16,
     flexGrow: 1,
   },
-  goalItem: {
+  summaryContainer: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
     borderRadius: 12,
-    overflow: 'hidden',
-  },
-  statusIndicator: {
-    width: 4,
-  },
-  goalContent: {
-    flex: 1,
     padding: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  summaryItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  summaryCount: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: colors.divider,
+  },
+  goalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   goalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
   },
   goalIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.background,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -242,70 +323,77 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: 2,
   },
   goalMeta: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
-  },
-  goalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginTop: 2,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-    marginLeft: 4,
   },
-  dateText: {
-    fontSize: 12,
+  goalDetails: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  detailLabel: {
+    fontSize: 13,
     color: colors.textSecondary,
   },
-  separator: {
-    height: 12,
+  detailValue: {
+    fontSize: 13,
+    color: colors.textPrimary,
+    fontWeight: '500',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 64,
+    paddingVertical: 60,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: colors.textPrimary,
     marginTop: 16,
-    marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
-  },
-  footer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-    backgroundColor: colors.background,
+    marginTop: 8,
+    paddingHorizontal: 40,
   },
   clearButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
+    marginTop: 12,
+    backgroundColor: '#FEE2E2',
     borderRadius: 12,
-    backgroundColor: colors.surface,
+    gap: 8,
   },
   clearButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.error,
-    marginLeft: 8,
+    color: '#EF4444',
   },
 });
 
