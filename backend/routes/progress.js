@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticateAndLoadUser: authenticate } = require('../middleware/auth');
 const { UserAchievement, ActivityCompletion, MoodEntry, CheckinResponse, UserGoal } = require('../models');
 const { Op } = require('sequelize');
+const { shortLived, swr } = require('../middleware/cacheHeaders');
 
 // Badge definitions
 const BADGES = {
@@ -129,8 +130,8 @@ const getDaysAgo = (days) => {
   return date;
 };
 
-// GET /api/progress/today - Today's goal completion status
-router.get('/today', authenticate, async (req, res) => {
+// GET /api/progress/today - Today's goal completion status (short-lived cache)
+router.get('/today', authenticate, shortLived, async (req, res) => {
   try {
     const user_id = req.user.dbId;
     const startOfToday = getStartOfToday();
@@ -175,8 +176,8 @@ router.get('/today', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/progress/streaks - Current streak counts
-router.get('/streaks', authenticate, async (req, res) => {
+// GET /api/progress/streaks - Current streak counts (short-lived cache)
+router.get('/streaks', authenticate, shortLived, async (req, res) => {
   try {
     const user_id = req.user.dbId;
 
@@ -346,8 +347,8 @@ async function calculateMoodStreak(user_id) {
   return streak;
 }
 
-// GET /api/progress/achievements - List all badges with unlocked status
-router.get('/achievements', authenticate, async (req, res) => {
+// GET /api/progress/achievements - List all badges with unlocked status (semi-static badge list with user data)
+router.get('/achievements', authenticate, swr, async (req, res) => {
   try {
     const user_id = req.user.dbId;
 
@@ -555,8 +556,8 @@ async function getUniqueDaysUsed(user_id) {
   return days.size;
 }
 
-// GET /api/progress/challenges - Get active challenges with progress
-router.get('/challenges', authenticate, async (req, res) => {
+// GET /api/progress/challenges - Get active challenges with progress (short-lived cache)
+router.get('/challenges', authenticate, shortLived, async (req, res) => {
   try {
     const user_id = req.user.dbId;
     const weekStart = getDaysAgo(7);

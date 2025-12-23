@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 
 const { connectSequelize, disconnectSequelize } = require('./config/sequelize');
 const { connectMongoDB, disconnectMongoDB } = require('./config/mongodb');
@@ -39,6 +40,20 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Enable response compression
+app.use(compression({
+  level: 6, // Balance between speed and compression ratio (1-9)
+  threshold: 1024, // Only compress responses > 1KB
+  filter: (req, res) => {
+    // Don't compress if client sends x-no-compression header
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
+
+// Enable weak ETags for conditional requests
+app.set('etag', 'weak');
 
 // Apply general rate limiting to all API routes
 app.use('/api', generalLimiter);

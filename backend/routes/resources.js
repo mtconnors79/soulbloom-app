@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { static: staticCache } = require('../middleware/cacheHeaders');
 
 // Crisis resources - hardcoded essential resources
 const CRISIS_RESOURCES = {
@@ -68,8 +69,8 @@ const CRISIS_RESOURCES = {
   supportMessage: 'You are not alone. Help is available. Reaching out is a sign of strength.',
 };
 
-// GET /api/resources/crisis - Get crisis resources
-router.get('/crisis', (req, res) => {
+// GET /api/resources/crisis - Get crisis resources (static, cached for 1 hour)
+router.get('/crisis', staticCache, (req, res) => {
   res.json({
     success: true,
     resources: CRISIS_RESOURCES,
