@@ -215,6 +215,12 @@ export const emergencyContactAPI = {
 };
 
 export const notificationAPI = {
+  // Device token management
+  registerDevice: (token, platform) =>
+    api.post('/notifications/register-device', { token, platform }),
+  unregisterDevice: (token) =>
+    api.post('/notifications/unregister-device', { token }),
+  // Legacy endpoints
   registerToken: (token) =>
     api.post('/notifications/token', { token }),
   removeToken: (token) =>
