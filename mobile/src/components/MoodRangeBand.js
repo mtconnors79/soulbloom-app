@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 
@@ -14,8 +14,10 @@ import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
  * - yMin: Minimum y value (default 1)
  * - yMax: Maximum y value (default 5)
  * - color: Base color for the band (default '#6366F1')
+ *
+ * Memoized to prevent re-renders when chart data hasn't changed.
  */
-const MoodRangeBand = ({
+const MoodRangeBand = memo(function MoodRangeBand({
   data,
   width,
   height,
@@ -90,7 +92,7 @@ const MoodRangeBand = ({
       </Svg>
     </View>
   );
-};
+});
 
 /**
  * Calculate range data from check-ins grouped by date

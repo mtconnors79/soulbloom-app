@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 
@@ -55,8 +55,10 @@ const PulsingFlag = ({ onPress }) => {
  * - paddingRight: Right padding
  * - paddingTop: Top padding
  * - onFlagPress: Callback when a flag is pressed (receives date info)
+ *
+ * Memoized to prevent re-renders when chart dimensions/data haven't changed.
  */
-const VarianceFlag = ({
+const VarianceFlag = memo(function VarianceFlag({
   rangeData,
   width,
   height,
@@ -123,19 +125,22 @@ const VarianceFlag = ({
       })}
     </View>
   );
-};
+});
 
 /**
  * VarianceFlagLegend - Legend item explaining the variance flag
+ * Memoized since it's a static display component.
  */
-export const VarianceFlagLegend = ({ style }) => (
-  <View style={[styles.legendContainer, style]}>
-    <View style={styles.legendIcon}>
-      <Icon name="warning" size={12} color="#F59E0B" />
+export const VarianceFlagLegend = memo(function VarianceFlagLegend({ style }) {
+  return (
+    <View style={[styles.legendContainer, style]}>
+      <View style={styles.legendIcon}>
+        <Icon name="warning" size={12} color="#F59E0B" />
+      </View>
+      <Text style={styles.legendText}>Mood swing 2+ levels</Text>
     </View>
-    <Text style={styles.legendText}>Mood swing 2+ levels</Text>
-  </View>
-);
+  );
+});
 
 /**
  * VarianceTooltip - Tooltip shown when a variance flag is pressed

@@ -5,7 +5,7 @@
  * Provides a consistent loading experience across the app.
  */
 
-import React from 'react';
+import React, { memo } from 'react';
 import {
   View,
   ActivityIndicator,
@@ -14,7 +14,10 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 
-const ScreenLoader = ({ message = 'Loading...', showMessage = true }) => {
+/**
+ * Memoized to prevent unnecessary re-renders during navigation transitions.
+ */
+const ScreenLoader = memo(function ScreenLoader({ message = 'Loading...', showMessage = true }) {
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={colors.primary} />
@@ -23,7 +26,7 @@ const ScreenLoader = ({ message = 'Loading...', showMessage = true }) => {
       )}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

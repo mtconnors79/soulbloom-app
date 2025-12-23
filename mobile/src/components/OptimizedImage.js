@@ -10,7 +10,7 @@
  * Can be upgraded to react-native-fast-image when React 19 support is added.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import {
   Image,
   View,
@@ -20,7 +20,11 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 
-const OptimizedImage = ({
+/**
+ * Memoized to prevent re-renders when image source hasn't changed.
+ * Uses custom comparison for source prop (compares uri for network images).
+ */
+const OptimizedImage = memo(function OptimizedImage({
   source,
   style,
   resizeMode = 'cover',
@@ -100,7 +104,19 @@ const OptimizedImage = ({
       />
     </View>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison - only re-render if source uri changes
+  const prevUri = prevProps.source?.uri;
+  const nextUri = nextProps.source?.uri;
+
+  // If both are network images, compare URIs
+  if (prevUri && nextUri) {
+    return prevUri === nextUri;
+  }
+
+  // For local images, use default shallow comparison
+  return prevProps.source === nextProps.source;
+});
 
 /**
  * Preload images for faster display
