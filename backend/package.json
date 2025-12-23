@@ -8,7 +8,9 @@
     "dev": "nodemon index.js",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
-    "test:ci": "jest --coverage --ci --forceExit"
+    "test:ci": "jest --coverage --ci --forceExit",
+    "db:migrate": "node scripts/run-migrations.js",
+    "db:indexes": "node scripts/createMongoIndexes.js"
   },
   "keywords": [
     "express",
