@@ -525,7 +525,7 @@ const AuditLogModal = ({ visible, connectionId, onClose }) => {
     return labels[actionType] || actionType;
   };
 
-  const renderLogItem = ({ item }) => (
+  const renderLogItem = useCallback(({ item }) => (
     <View style={styles.logItem}>
       <View style={styles.logIcon}>
         <Icon name={getActionIcon(item.action_type)} size={18} color={colors.primary} />
@@ -536,7 +536,17 @@ const AuditLogModal = ({ visible, connectionId, onClose }) => {
         <Text style={styles.logDate}>{formatDate(item.created_at)}</Text>
       </View>
     </View>
-  );
+  ), []);
+
+  const logKeyExtractor = useCallback((item) => item.id, []);
+
+  // Log item height for getItemLayout (approx. 72px)
+  const LOG_ITEM_HEIGHT = 72;
+  const getLogItemLayout = useCallback((data, index) => ({
+    length: LOG_ITEM_HEIGHT,
+    offset: LOG_ITEM_HEIGHT * index,
+    index,
+  }), []);
 
   return (
     <Modal
@@ -576,8 +586,14 @@ const AuditLogModal = ({ visible, connectionId, onClose }) => {
               <FlatList
                 data={logs}
                 renderItem={renderLogItem}
-                keyExtractor={(item) => item.id}
+                keyExtractor={logKeyExtractor}
                 showsVerticalScrollIndicator={false}
+                // Performance optimizations
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                removeClippedSubviews={true}
+                getItemLayout={getLogItemLayout}
               />
             )}
           </View>

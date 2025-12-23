@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import {
   View,
   Text,
@@ -347,4 +347,6 @@ const styles = StyleSheet.create({
   },
 });
 
-export default GoalCard;
+// Wrap with React.memo to prevent unnecessary re-renders
+// Only re-renders when goal, onEdit, or onDelete props change
+export default memo(GoalCard);

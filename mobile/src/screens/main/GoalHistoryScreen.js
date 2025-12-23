@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -116,7 +116,7 @@ const GoalHistoryScreen = ({ navigation }) => {
     };
   };
 
-  const renderGoalItem = ({ item }) => {
+  const renderGoalItem = useCallback(({ item }) => {
     const statusInfo = getStatusInfo(item);
 
     return (
@@ -168,7 +168,7 @@ const GoalHistoryScreen = ({ navigation }) => {
         </View>
       </View>
     );
-  };
+  }, []);
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -217,6 +217,18 @@ const GoalHistoryScreen = ({ navigation }) => {
     );
   };
 
+  // Memoize keyExtractor to prevent recreation on each render
+  // NOTE: Hooks must be called before early returns
+  const keyExtractor = useCallback((item) => item.id, []);
+
+  // Item height for getItemLayout optimization (approx. 180px per goal card)
+  const ITEM_HEIGHT = 180;
+  const getItemLayout = useCallback((data, index) => ({
+    length: ITEM_HEIGHT,
+    offset: ITEM_HEIGHT * index,
+    index,
+  }), []);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -230,7 +242,7 @@ const GoalHistoryScreen = ({ navigation }) => {
     <View style={styles.container}>
       <FlatList
         data={goals}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderGoalItem}
         ListEmptyComponent={renderEmpty}
         ListHeaderComponent={renderHeader}
@@ -239,6 +251,12 @@ const GoalHistoryScreen = ({ navigation }) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        // Performance optimizations
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={true}
+        getItemLayout={getItemLayout}
       />
     </View>
   );

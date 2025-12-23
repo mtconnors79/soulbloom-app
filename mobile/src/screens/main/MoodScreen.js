@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -459,7 +459,7 @@ const MoodScreen = () => {
     return 'Very High';
   };
 
-  const calculateAvgMood = () => {
+  const calculateAvgMood = useCallback(() => {
     let totalScore = 0;
     let totalCount = 0;
 
@@ -480,7 +480,7 @@ const MoodScreen = () => {
     }
 
     return totalCount > 0 ? totalScore / totalCount : null;
-  };
+  }, [checkinStats, recentMoods]);
 
   const chartConfig = {
     backgroundGradientFrom: '#fff',
@@ -500,11 +500,32 @@ const MoodScreen = () => {
     color: (opacity = 1) => `rgba(239, 68, 68, ${opacity})`,
   };
 
-  const moodTrendData = detailedMoodView ? getDetailedMoodData() : getMoodTrendDataSummary();
-  const rangeData = detailedMoodView && !showAllEntries ? getMoodRangeData() : [];
-  const stressTrendData = detailedStressView ? getStressTrendDataDetailed() : getStressTrendDataSummary();
-  const emotionChartData = getEmotionChartData();
-  const avgMood = calculateAvgMood();
+  // Memoize chart data to prevent recalculation on every render
+  const moodTrendData = useMemo(
+    () => detailedMoodView ? getDetailedMoodData() : getMoodTrendDataSummary(),
+    [detailedMoodView, getDetailedMoodData, getMoodTrendDataSummary]
+  );
+
+  const rangeData = useMemo(
+    () => detailedMoodView && !showAllEntries ? getMoodRangeData() : [],
+    [detailedMoodView, showAllEntries, getMoodRangeData]
+  );
+
+  const stressTrendData = useMemo(
+    () => detailedStressView ? getStressTrendDataDetailed() : getStressTrendDataSummary(),
+    [detailedStressView, getStressTrendDataDetailed, getStressTrendDataSummary]
+  );
+
+  const emotionChartData = useMemo(
+    () => getEmotionChartData(),
+    [getEmotionChartData]
+  );
+
+  const avgMood = useMemo(
+    () => calculateAvgMood(),
+    [calculateAvgMood]
+  );
+
   const avgStress = checkinStats?.averageStressLevel;
 
   if (loading) {
