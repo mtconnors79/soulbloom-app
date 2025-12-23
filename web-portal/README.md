@@ -1,16 +1,109 @@
-# React + Vite
+# SoulBloom Web Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React web application for Care Circle trusted persons to view shared patient data.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+# Install dependencies
+npm install
 
-## React Compiler
+# Configure environment
+cp .env.example .env
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# Run development server
+npm run dev
 
-## Expanding the ESLint configuration
+# Build for production
+npm run build
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Environment Variables
+
+```env
+VITE_API_URL=http://localhost:3000
+VITE_FIREBASE_API_KEY=your-api-key
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+```
+
+## Features
+
+- **Login/Register** - Firebase authentication
+- **Dashboard** - View patients sharing with you
+- **Patient View** - Mood trends, check-ins, statistics
+- **Export** - PDF reports
+- **Print** - Printable reports
+- **Accept Invites** - Public invite acceptance page
+
+## Tech Stack
+
+- React 18
+- Vite (build tool)
+- Tailwind CSS v4
+- React Router
+- Recharts (charts)
+- @react-pdf/renderer (PDF export)
+- Firebase Auth
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── Layout.js           # Responsive sidebar layout
+│   ├── LazyImage.js        # Lazy loading images
+│   ├── ExportReport.js     # PDF generation
+│   └── PrintableReport.js  # Browser print view
+├── context/
+│   └── AuthContext.js      # Firebase auth state
+├── pages/
+│   ├── Login.jsx
+│   ├── Register.jsx
+│   ├── Dashboard.jsx       # Patient list
+│   ├── PatientView.jsx     # Patient data display
+│   └── AcceptInvite.jsx    # Public invite page
+├── services/
+│   └── api.js              # Backend API client
+└── App.jsx                 # Router setup
+```
+
+## Pages
+
+| Page | Path | Auth | Description |
+|------|------|------|-------------|
+| Login | /login | No | Firebase email/password login |
+| Register | /register | No | Create new account |
+| Dashboard | / | Yes | List connected patients |
+| Patient View | /patient/:id | Yes | View shared data |
+| Accept Invite | /accept/:token | No | Accept Care Circle invite |
+
+## API Integration
+
+The portal connects to the SoulBloom backend for:
+- Care Circle connection management
+- Shared patient data (mood, check-ins, trends)
+- PDF export data generation
+
+## Performance
+
+- Code-split routes (React.lazy)
+- Lazy loading images
+- PDF renderer loaded on-demand
+- Initial bundle: ~440KB (gzipped: ~135KB)
+
+## Scripts
+
+```bash
+npm run dev      # Start dev server (port 5173)
+npm run build    # Build for production
+npm run preview  # Preview production build
+npm run lint     # Run ESLint
+```
+
+## Styling
+
+Uses Tailwind CSS v4 with SoulBloom color palette:
+- Primary: #355F5B (teal)
+- Accent colors for mood indicators
+- Responsive design for mobile/desktop

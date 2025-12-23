@@ -1,123 +1,68 @@
-# SoulBloom - Mental Health & Wellness App
+# SoulBloom
 
-*Grow gently, live fully*
+**"Grow gently, live fully."**
 
-A comprehensive mental health tracking and wellness application built with React Native (iOS/Android) and Node.js backend.
+A comprehensive AI-driven mental health application supporting users through daily check-ins, mood tracking, mindfulness activities, and crisis detection.
 
 ## Features
 
-### Daily Check-In with AI Analysis
-- Structured check-in flow with mood rating, stress level slider, and emotion tags
-- Free-form journaling with AI-powered sentiment analysis via Claude
-- **Analysis Results Modal** after save with:
-  - Supportive message, detected emotions, wellness suggestions
-  - Prominent crisis resources for high-risk entries (dismissible)
-- Risk level assessment: low, moderate, high, critical
-- Topic detection for contextual resource suggestions
+### Core Wellness
+- **Daily Check-ins** - Mood, emotions, stress level, and journaling
+- **Quick Mood Logging** - Fast emoji-based mood tracking
+- **Mood Trends** - Visualize patterns with charts (summary + detailed views)
+- **Mood Variability** - Min/max range bands, variance flags for conditions like bipolar
+- **AI Analysis** - Sentiment analysis and risk detection via Claude API
 
-### Quick Mood Logging
-- One-tap mood logging from the home screen
-- 5-point emoji scale (Great, Good, Okay, Not Great, Difficult)
-- Instant mood tracking without full check-in flow
+### Crisis Support
+- **Crisis Detection** - Keyword and AI-based risk level assessment
+- **Crisis Resources** - 988, Crisis Text Line, 911 with tiered display
+- **Emergency Contacts** - SMS alerts when calling 911
+- **Contextual Resources** - Topic-based prompts (domestic violence, substance use, etc.)
 
-### My Journey - Mood Trends & Visualization
-- **Hybrid Mood Charts** with Summary/Detailed toggle:
-  - Summary view: Daily averages, tappable points to see day's entries
-  - Detailed view: Individual entries with timestamps, source type tags
-- **Day Details Modal**: Shows all entries for selected day with emoji, source tag
-- Stress level trend chart with same toggle functionality
-- Sentiment distribution breakdown
-- Check-in history with date range filtering (7/30/90 days)
-- Track emotional patterns over time
+### Mindfulness
+- **Breathing Exercises** - Box breathing, 4-7-8, and more with animated timers
+- **Activity Library** - Grounding exercises, guided meditation links
+- **Post Check-in Suggestions** - Activity recommendations based on mood
 
-### Mindfulness Activity Library
-- **Breathing Exercises**: Box Breathing, 4-7-8 Relaxing Breath, Deep Belly Breathing with animated visual guides
-- **Grounding Techniques**: 5-4-3-2-1 Senses, Body Scan exercises
-- **Quick Resets**: 1-minute calm, Tension release exercises
-- **Guided Meditations**: Links to UCLA Mindful meditations
-- **Sleep Support**: Sleep-focused breathing and body scan
-- Activity completion tracking with streaks
+### Goals & Progress
+- **Automatic Daily Goals** - Check-in, mindfulness, mood logging
+- **User-Defined Goals** - Custom goals with templates
+- **Streaks** - Track consecutive days of activity
+- **Achievements/Badges** - Unlock milestones (11 badges)
 
-### Progress & Achievements
-- **Today's Goals**: Track daily check-in, mindfulness, and mood logging completion
-- **Streaks**: Maintain consecutive day streaks for each activity type
-- **Badges**: Unlock 9 achievement badges (First Steps, Week Warrior, Zen Master, etc.)
-- **Weekly Challenges**: Complete curated challenges like "Daily Calm" and "Mood Awareness"
-- Congratulations modal when unlocking new achievements
+### Care Circle
+- **Trusted Person Sharing** - Invite family/friends to view your data
+- **Web Portal** - Trusted persons access via browser
+- **Tiered Access** - Full data or data without journal text
+- **Audit Logging** - Track who accessed what
 
-### Crisis Resources & Support System
-- **Critical Risk Detection**: Required acknowledgment modal for suicide/self-harm mentions
-- **High Risk Support**: Dismissible modal with prominent 988/Crisis Text Line buttons
-- **Contextual Resource Prompts**: Topic detection for 8 sensitive topics with relevant hotlines
-  - Domestic violence, substance abuse, eating disorders, financial stress
-  - Grief, self-harm, LGBTQ+ support, veteran support
-- **Subtle Support Link**: "Need support?" shown for negative sentiment entries
-- **Manual Access**: Crisis resources via Profile screen
-- **Settings Toggle**: "Resource Suggestions" preference in Settings
-
-### Emergency Contacts with Consent Flow
-- Add support contacts with SMS confirmation workflow
-- 14-day token expiration with resend capability
-- HTML consent page explaining contact responsibilities
-- **911 Notification Flow**: When calling 911 from crisis modal:
-  - Prompts to notify primary emergency contact via SMS
-  - Auto-opens phone dialer after SMS composer closes
-  - Pre-filled message: "[Name] may be going through a difficult time..."
-- Manual "Notify my support contact" button in crisis modal
-
-### Scheduled Reminders
-- Daily check-in reminder with customizable time
-- Custom reminders with frequency options (daily/weekdays/weekends/custom)
-- Multiple reminder types (check-in/mindfulness/both)
-
-### User Authentication
-- Firebase Authentication with Google Sign-In
-- Secure JWT token management
-- Automatic token refresh
-- Profile management with preferences
+### Notifications
+- **Local Reminders** - Scheduled check-in and mindfulness reminders
+- **Push Notifications (FCM)** - Pattern intervention, streak reminders, goal alerts
+- **Quiet Hours** - Configurable do-not-disturb times
+- **Smart Limits** - Daily notification caps
 
 ## Tech Stack
 
-### Frontend (Mobile)
-- React Native 0.83
-- React Navigation (Bottom Tabs + Stack)
-- Firebase Auth with Google Sign-In
-- react-native-config for environment variables
-- react-native-vector-icons (Ionicons)
-- Animated API for breathing exercise visuals
-- @notifee/react-native for local notifications
-
-### Backend
-- Node.js with Express
-- PostgreSQL (Sequelize ORM) - Users, Profiles, Mood Entries, Achievements
-- MongoDB (Mongoose) - Check-in responses, Activity logs
-- Firebase Admin SDK for token verification
-- Anthropic Claude API for sentiment analysis
+| Component | Technology |
+|-----------|------------|
+| Mobile App | React Native 0.76+ (iOS + Android) |
+| Web Portal | React 18 + Vite + Tailwind CSS |
+| Backend | Node.js + Express |
+| Databases | PostgreSQL + MongoDB |
+| Auth | Firebase Authentication |
+| AI | Claude API (Anthropic) |
+| Push | Firebase Cloud Messaging |
+| Notifications | @notifee/react-native |
 
 ## Project Structure
 
 ```
 soulbloom-app/
-├── backend/                 # Node.js API server
-│   ├── config/             # Database and Firebase configuration
-│   ├── controllers/        # Request handlers
-│   ├── data/               # Static data (topic patterns, resources)
-│   ├── middleware/         # Auth, rate limiting, error handling
-│   ├── models/             # Sequelize and Mongoose models
-│   ├── routes/             # API route definitions
-│   ├── services/           # Business logic (sentiment, notifications)
-│   └── index.js            # Server entry point
-│
-├── mobile/                  # React Native app
-│   ├── ios/SoulBloom/      # iOS native code
-│   ├── android/            # Android native code
-│   └── src/
-│       ├── components/     # Reusable UI components
-│       ├── navigation/     # Navigation configuration
-│       ├── screens/        # Screen components
-│       └── services/       # API client and utilities
-│
-└── README.md               # This file
+├── mobile/          # React Native app (iOS + Android)
+├── backend/         # Node.js Express API server
+├── web-portal/      # React web app for Care Circle
+└── README.md        # This file
 ```
 
 ## Quick Start
@@ -126,199 +71,84 @@ soulbloom-app/
 - Node.js 18+
 - PostgreSQL 14+
 - MongoDB 6+
-- Xcode 15+ (for iOS development)
-- Android Studio (for Android development)
-- Firebase project with Authentication enabled
+- Xcode 15+ (for iOS)
+- Android Studio (for Android)
+- Firebase project configured
 
-### 1. Clone the Repository
+### Installation
+
 ```bash
+# Clone repository
 git clone https://github.com/mtconnors79/soulbloom-app.git
 cd soulbloom-app
-```
 
-### 2. Backend Setup
-```bash
+# Backend setup
 cd backend
+cp .env.example .env  # Configure environment variables
 npm install
+npm run db:migrate
+npm run db:indexes
+npm run dev
 
-# Copy environment template and configure
-cp .env.example .env
-# Edit .env with your database credentials and API keys
-
-# Set up Firebase service account
-# Download from Firebase Console > Project Settings > Service Accounts
-# Save as backend/config/firebase-service-account.json
-
-# Start the server
-npm start
-```
-
-### 3. Database Setup
-```bash
-# PostgreSQL - Create database
-createdb soulbloom_db
-# Tables are auto-created by Sequelize on first run
-
-# MongoDB - Start service
-brew services start mongodb-community
-# Collections are created automatically
-```
-
-### 4. Mobile Setup
-```bash
+# Mobile setup (new terminal)
 cd mobile
+cp .env.example .env  # Configure environment variables
 npm install
-
-# iOS only: Install CocoaPods dependencies
 cd ios && pod install && cd ..
+npx react-native run-ios  # or run-android
 
-# Copy environment template
-cp .env.example .env
-# Edit .env with your Google Sign-In client IDs and API URL
-
-# Run on iOS Simulator
-npx react-native run-ios
-
-# Run on Android Emulator
-npx react-native run-android
+# Web portal setup (new terminal)
+cd web-portal
+cp .env.example .env  # Configure environment variables
+npm install
+npm run dev
 ```
 
-## Environment Variables
+## API Endpoints Overview
 
-### Backend (.env)
-| Variable | Description |
-|----------|-------------|
-| `PORT` | Server port (default: 3000) |
-| `NODE_ENV` | Environment (development/production) |
-| `API_BASE_URL` | Public API URL for confirmation links |
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | PostgreSQL connection |
-| `MONGODB_URI` | MongoDB connection string |
-| `FIREBASE_*` | Firebase project configuration |
-| `ANTHROPIC_API_KEY` | Claude API key for sentiment analysis |
-| `JWT_SECRET` | Secret for JWT token signing |
-| `JWT_EXPIRES_IN` | Token expiration (default: 7d) |
+### Core APIs
+| API | Endpoints | Description |
+|-----|-----------|-------------|
+| `/api/auth` | register, login, me | Authentication |
+| `/api/checkins` | CRUD + analyze | Daily check-ins with AI |
+| `/api/mood` | CRUD + stats | Mood entries |
+| `/api/activities/mindfulness` | list, complete, stats | Mindfulness activities |
+| `/api/progress` | today, streaks, achievements, challenges | Progress tracking |
+| `/api/goals` | CRUD + templates | User-defined goals |
 
-### Mobile (.env)
-| Variable | Description |
-|----------|-------------|
-| `IOS_CLIENT_ID` | Google Sign-In iOS client ID |
-| `WEB_CLIENT_ID` | Google Sign-In web client ID |
-| `API_BASE_URL` | Backend API URL |
-
-## API Endpoints
-
-### Authentication (`/api/auth`)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/register` | Register new user |
-| POST | `/login` | Login with email/password |
-| POST | `/register/firebase` | Register with Firebase token |
-| POST | `/login/firebase` | Login with Firebase token |
-| GET | `/me` | Get current user info |
-
-### Check-ins (`/api/checkins`)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/` | Create check-in with AI analysis |
-| GET | `/` | List check-ins (paginated) |
-| GET | `/stats` | Get check-in statistics |
-| GET | `/:id` | Get single check-in |
-| PUT | `/:id` | Update check-in |
-| DELETE | `/:id` | Delete check-in |
-| POST | `/analyze` | Analyze text without saving |
-
-### Mood (`/api/mood`)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/` | Create mood entry |
-| GET | `/` | List mood entries |
-| GET | `/stats` | Get mood statistics (supports `days` param) |
-| GET | `/:id` | Get mood entry |
-| PUT | `/:id` | Update mood entry |
-| DELETE | `/:id` | Delete mood entry |
-
-### Mindfulness (`/api/activities/mindfulness`)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | List all activities by category |
-| GET | `/:activityId` | Get activity details |
-| POST | `/:activityId/complete` | Mark activity complete |
-| GET | `/stats/user` | Get user's completion stats |
-| GET | `/suggested/activity` | Get suggested activity based on mood |
-
-### Progress (`/api/progress`)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/today` | Today's goal completion status |
-| GET | `/streaks` | Current streak counts |
-| GET | `/achievements` | All badges with unlock status |
-| POST | `/achievements/check` | Check and unlock earned badges |
-| GET | `/challenges` | Weekly challenges with progress |
-
-### Resources (`/api/resources`)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/crisis` | Get crisis support resources |
-
-### Profile (`/api/profile`)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | Get user profile |
-| PUT | `/` | Update profile |
-| PUT | `/preferences` | Update preferences |
-| DELETE | `/preferences/:key` | Delete preference |
-
-### Emergency Contacts (`/api/emergency-contacts`)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/` | Create contact (returns SMS template) |
-| GET | `/` | List contacts |
-| GET | `/primary` | Get active primary contact |
-| GET | `/confirm/:token` | HTML consent page (public) |
-| POST | `/confirm/:token` | Accept/decline confirmation (public) |
-| POST | `/:id/resend` | Resend confirmation SMS |
-| GET | `/:id` | Get contact |
-| PUT | `/:id` | Update contact |
-| DELETE | `/:id` | Delete contact |
-
-### Notifications (`/api/notifications`)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/token` | Register device token |
-| DELETE | `/token` | Remove device token |
-| GET | `/status` | Get notification status |
-| POST | `/test` | Send test notification |
+### Support APIs
+| API | Endpoints | Description |
+|-----|-----------|-------------|
+| `/api/resources` | crisis | Crisis support resources |
+| `/api/emergency-contacts` | CRUD + confirm | Emergency contacts with consent |
+| `/api/care-circle` | connections, invite, accept, data | Care Circle sharing |
+| `/api/notifications` | register, preferences, history | Push notifications |
 
 ## Rate Limits
 
 | Endpoint Type | Limit |
 |---------------|-------|
-| General API | 100 requests / 15 min |
-| Authentication | 5 requests / 15 min |
-| AI Analysis | 20 requests / hour |
-| Check-in Creation | 10 requests / hour |
+| General | 100 req/15 min |
+| Auth | 5 req/15 min |
+| AI/Analysis | 20 req/hour |
+| Check-in | 10 req/hour |
 
-## Mobile App Screens
+## Documentation
 
-| Screen | Tab | Description |
-|--------|-----|-------------|
-| Home | Home | Greeting, quick mood, suggested activity, weekly summary |
-| CheckIn | Check-In | Structured check-in flow with AI analysis |
-| Mood | My Journey | Mood trends, charts, check-in history |
-| Mindfulness | Mindfulness | Activity library with breathing exercises |
-| Progress | Progress | Today's goals, streaks, achievements, challenges |
-| Profile | Profile | User settings, crisis resources access |
-| Settings | (Stack) | Notification reminders, display, about |
-| Emergency Contacts | (Stack) | Support contact management |
+- [Mobile App](./mobile/README.md)
+- [Backend API](./backend/README.md)
+- [Web Portal](./web-portal/README.md)
 
-## Contributing
+## Services
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+| Service | Default Port |
+|---------|--------------|
+| Backend API | 3000 |
+| Metro Bundler | 8081 |
+| Web Portal | 5173 |
+| PostgreSQL | 5432 |
+| MongoDB | 27017 |
 
 ## License
 
-This project is private and not licensed for public use.
+Private - All rights reserved
