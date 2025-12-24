@@ -21,13 +21,13 @@ const RATE_LIMITS = {
   }
 };
 
-// Key generator: use user ID for authenticated users, IP for anonymous
+// Key generator: use user ID for authenticated users, fallback for anonymous
 const userKeyGenerator = (req) => {
   if (req.user?.dbId) {
     return `user_${req.user.dbId}`;
   }
-  // Fallback to IP for anonymous users
-  return req.ip || req.connection?.remoteAddress || 'anonymous';
+  // Fallback to anonymous key to avoid IPv6 validation issues
+  return 'anonymous';
 };
 
 // Create smart rate limit handler with distress context
