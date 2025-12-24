@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useRoute } from '@react-navigation/native';
 import { mindfulnessAPI, progressAPI } from '../../services/api';
 import BreathingExerciseModal from '../../components/BreathingExerciseModal';
 import { colors } from '../../theme/colors';
@@ -114,6 +115,7 @@ const CategorySection = ({ category, activities, onActivityPress }) => {
 };
 
 const MindfulnessScreen = () => {
+  const route = useRoute();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -122,6 +124,7 @@ const MindfulnessScreen = () => {
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [showBreathingModal, setShowBreathingModal] = useState(false);
   const [completionLoading, setCompletionLoading] = useState(false);
+  const hasAutoOpened = useRef(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -145,6 +148,48 @@ const MindfulnessScreen = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Handle auto-open from navigation params (e.g., from HomeScreen suggested activity)
+  useEffect(() => {
+    const { activityId, activityCategory, autoOpen } = route.params || {};
+
+    // Only auto-open once per navigation, and only after activities are loaded
+    if (autoOpen && activityId && !loading && Object.keys(activities).length > 0 && !hasAutoOpened.current) {
+      hasAutoOpened.current = true;
+
+      // Find the activity in our loaded activities
+      let foundActivity = null;
+
+      // Search in the specific category first if provided
+      if (activityCategory && activities[activityCategory]) {
+        foundActivity = activities[activityCategory].find(a => a.id === activityId);
+      }
+
+      // If not found, search all categories
+      if (!foundActivity) {
+        for (const categoryActivities of Object.values(activities)) {
+          foundActivity = categoryActivities.find(a => a.id === activityId);
+          if (foundActivity) break;
+        }
+      }
+
+      if (foundActivity) {
+        // Auto-open the activity (same logic as handleActivityPress)
+        if (foundActivity.category === 'breathing' || foundActivity.instructions) {
+          setSelectedActivity(foundActivity);
+          setShowBreathingModal(true);
+        } else if (foundActivity.steps) {
+          // For grounding/other activities, show the steps alert
+          // Note: Using simpler alert without completion callback to avoid dependency issues
+          Alert.alert(
+            foundActivity.name,
+            foundActivity.steps.join('\n\n'),
+            [{ text: 'Got it', style: 'default' }]
+          );
+        }
+      }
+    }
+  }, [route.params, loading, activities]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

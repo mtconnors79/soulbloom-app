@@ -176,7 +176,11 @@ const HomeScreen = ({ navigation }) => {
       {suggestedActivity && (
         <TouchableOpacity
           style={styles.suggestedCard}
-          onPress={() => navigation.navigate('Mindfulness')}
+          onPress={() => navigation.navigate('Mindfulness', {
+            activityId: suggestedActivity.activity?.id,
+            activityCategory: suggestedActivity.activity?.category,
+            autoOpen: true,
+          })}
         >
           <View style={styles.suggestedHeader}>
             <Icon name="leaf" size={20} color={colors.success} />
