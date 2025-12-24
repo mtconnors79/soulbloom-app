@@ -41,9 +41,11 @@ const PORT = process.env.PORT || 3000;
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
     ? [
-        /\.elasticbeanstalk\.com$/,  // Allow EB domains
-        /\.soulbloom\.com$/,          // Allow soulbloom domains
-        process.env.FRONTEND_URL      // Allow configured frontend URL
+        /\.elasticbeanstalk\.com$/,   // Allow EB domains
+        /\.soulbloom\.com$/,           // Allow soulbloom.com domains
+        /\.soulbloom\.care$/,          // Allow soulbloom.care domains
+        /^https:\/\/soulbloom\.care$/, // Allow root soulbloom.care
+        process.env.FRONTEND_URL       // Allow configured frontend URL
       ].filter(Boolean)
     : '*', // Allow all in development
   credentials: true,
